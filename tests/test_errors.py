@@ -42,25 +42,13 @@ class TestErrorHandling:
         with pytest.raises(ValueError):
             cfd_python.get_solver_info('')
 
-    @pytest.mark.skip(reason="C library exits process on invalid dimensions instead of raising exception")
     def test_create_grid_zero_dimensions(self):
-        """Test error handling for zero grid dimensions.
-
-        Note: Currently the C library calls exit() on memory allocation failure
-        for zero dimensions. This test is skipped until proper error handling
-        is implemented in the C library.
-        """
+        """Test error handling for zero grid dimensions."""
         with pytest.raises(ValueError):
             cfd_python.create_grid(0, 10, 0.0, 1.0, 0.0, 1.0)
 
-    @pytest.mark.skip(reason="C library exits process on invalid dimensions instead of raising exception")
     def test_create_grid_negative_dimensions(self):
-        """Test error handling for negative grid dimensions.
-
-        Note: Currently the C library calls exit() on memory allocation failure
-        for negative dimensions. This test is skipped until proper error handling
-        is implemented in the C library.
-        """
+        """Test error handling for negative grid dimensions."""
         with pytest.raises(ValueError):
             cfd_python.create_grid(-5, 10, 0.0, 1.0, 0.0, 1.0)
 
