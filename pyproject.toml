@@ -1,0 +1,143 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.4.3",
+    "setuptools-scm>=6.2",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cfd-python"
+dynamic = ["version"]
+description = "High-performance CFD simulation library with Python bindings"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "CFD Team"},
+]
+requires-python = ">=3.8"
+keywords = ["cfd", "fluid-dynamics", "simulation", "numerical-methods", "physics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+
+# TODO: Add project URLs before release
+# [project.urls]
+# Homepage = "https://github.com/your-org/cfd-python"
+# Documentation = "https://cfd-python.readthedocs.io"
+# Repository = "https://github.com/your-org/cfd-python.git"
+# Issues = "https://github.com/your-org/cfd-python/issues"
+# Changelog = "https://github.com/your-org/cfd-python/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-benchmark",
+    "numpy",
+]
+docs = [
+    "sphinx>=5.0",
+    "sphinx-rtd-theme",
+    "myst-parser",
+]
+dev = [
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+    "pre-commit",
+]
+viz = [
+    "matplotlib",
+    "plotly",
+    "vtk",
+]
+
+[tool.scikit-build]
+# Protect the configuration against future changes in scikit-build-core
+minimum-version = "0.4"
+
+# Setuptools-style build caching in a local directory
+build-dir = "build/{wheel_tag}"
+
+# Build stable ABI wheels for CPython 3.8+
+wheel.expand-macos-universal-tags = true
+
+[tool.scikit-build.cmake.define]
+CMAKE_BUILD_TYPE = "Release"
+CFD_STATIC_LINK = "ON"
+
+[tool.scikit-build.metadata]
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.cibuildwheel]
+# Build wheels for Python 3.8+
+build = ["cp38-*", "cp39-*", "cp310-*", "cp311-*", "cp312-*"]
+skip = ["*-musllinux_*", "pp*"]  # Skip PyPy and musl Linux
+
+# Test command to verify wheels work
+test-command = [
+    "python -c 'import cfd_python; print(f\"CFD Python {cfd_python.__version__} imported successfully\")'",
+    "python -c 'import cfd_python; print(f\"Available solvers: {cfd_python.list_solvers()}\")'",
+    "python -c 'import cfd_python; result = cfd_python.run_simulation(5, 5, 3); print(f\"Test simulation: {len(result)} points computed\")'",
+]
+
+# Global environment - static linking for self-contained wheels
+# CFD_ROOT can be set to override the default ../cfd location
+# CFD_USE_STABLE_ABI is enabled for wheel builds to support multiple Python versions
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
+
+[tool.cibuildwheel.windows]
+# Windows-specific configuration
+# Build CFD library first (static), then build Python extension
+# CFD_ROOT is set in environment below
+before-build = [
+    "cd %CFD_ROOT% && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd %CFD_ROOT% && cmake --build build --config Release",
+]
+# No repair needed for statically linked wheels
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
+
+[tool.cibuildwheel.macos]
+# macOS-specific configuration
+# CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
+before-build = [
+    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
+]
+# delocate handles any remaining dynamic dependencies (system libs)
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
+
+[tool.cibuildwheel.linux]
+# Linux-specific configuration
+before-all = [
+    "yum install -y cmake3 gcc-c++ || apt-get update && apt-get install -y cmake g++",
+]
+# CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
+before-build = [
+    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
+]
+# auditwheel handles any remaining dynamic dependencies (system libs)
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
