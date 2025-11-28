@@ -20,6 +20,8 @@ pip install cfd-python
 
 ### From Source
 
+The Python package requires the C CFD library to be built first. By default, it expects the library at `../cfd` relative to the cfd-python directory. You can override this by setting the `CFD_ROOT` environment variable.
+
 1. Build the C CFD library (static):
 
    ```bash
@@ -33,6 +35,12 @@ pip install cfd-python
    ```bash
    cd ../cfd-python
    pip install .
+   ```
+
+   Or with a custom library location:
+
+   ```bash
+   CFD_ROOT=/path/to/cfd pip install .
    ```
 
 ### For Development
@@ -51,11 +59,11 @@ print(cfd_python.list_solvers())
 # ['explicit_euler', 'explicit_euler_optimized', 'projection', ...]
 
 # Run a simple simulation
-velocity_magnitude = cfd_python.run_simulation(nx=50, ny=50, steps=100)
+velocity_magnitude = cfd_python.run_simulation(50, 50, steps=100)
 print(f"Computed {len(velocity_magnitude)} velocity values")
 
 # Create a grid
-grid = cfd_python.create_grid(nx=100, ny=100, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0)
+grid = cfd_python.create_grid(100, 100, 0.0, 1.0, 0.0, 1.0)
 print(f"Grid: {grid['nx']}x{grid['ny']}")
 
 # Get default solver parameters
@@ -67,7 +75,7 @@ print(f"Default dt: {params['dt']}")
 
 ### Simulation Functions
 
-#### `run_simulation(nx, ny, steps=100, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, output_file=None)`
+#### `run_simulation(nx, ny, steps=100, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, solver_type=None, output_file=None)`
 
 Run a complete simulation with default parameters.
 
@@ -76,27 +84,35 @@ Run a complete simulation with default parameters.
 - `nx`, `ny`: Grid dimensions
 - `steps`: Number of time steps (default: 100)
 - `xmin`, `xmax`, `ymin`, `ymax`: Domain bounds (optional)
+- `solver_type`: Solver name string (optional, uses library default)
 - `output_file`: VTK output file path (optional)
 
 **Returns:** List of velocity magnitude values
 
-#### `run_simulation_with_params(nx, ny, steps, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, solver_type=None, output_file=None)`
+#### `run_simulation_with_params(nx, ny, xmin, xmax, ymin, ymax, steps=1, dt=0.001, cfl=0.2, solver_type=None, output_file=None)`
 
-Run simulation with custom solver selection.
+Run simulation with custom parameters and solver selection.
 
 **Parameters:**
 
 - `nx`, `ny`: Grid dimensions
-- `steps`: Number of time steps
 - `xmin`, `xmax`, `ymin`, `ymax`: Domain bounds
+- `steps`: Number of time steps (default: 1)
+- `dt`: Time step size (default: 0.001)
+- `cfl`: CFL number (default: 0.2)
 - `solver_type`: Solver name string (optional, uses library default)
 - `output_file`: VTK output file path (optional)
 
 **Returns:** Dictionary with `velocity_magnitude`, `nx`, `ny`, `steps`, `solver_name`, `solver_description`, and `stats`
 
-#### `create_grid(nx, ny, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0)`
+#### `create_grid(nx, ny, xmin, xmax, ymin, ymax)`
 
 Create a computational grid.
+
+**Parameters:**
+
+- `nx`, `ny`: Grid dimensions
+- `xmin`, `xmax`, `ymin`, `ymax`: Domain bounds
 
 **Returns:** Dictionary with `nx`, `ny`, `xmin`, `xmax`, `ymin`, `ymax`, `x_coords`, `y_coords`
 

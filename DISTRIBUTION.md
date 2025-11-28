@@ -123,25 +123,27 @@ This creates wheels for Python 3.8-3.12 on all platforms.
 
 ### Platform-Specific Build Steps
 
-The `pyproject.toml` configures platform-specific build steps:
+The `pyproject.toml` configures platform-specific build steps. The `CFD_ROOT` environment variable specifies the C library location (defaults to `../cfd`):
 
 **Windows:**
 ```toml
 [tool.cibuildwheel.windows]
 before-build = [
-    "cd ../cfd && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ../cfd && cmake --build build --config Release",
+    "cd %CFD_ROOT% && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd %CFD_ROOT% && cmake --build build --config Release",
 ]
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
 ```
 
 **macOS:**
 ```toml
 [tool.cibuildwheel.macos]
 before-build = [
-    "cd ../cfd && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ../cfd && cmake --build build --config Release",
+    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
 ]
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
 ```
 
 **Linux:**
@@ -151,10 +153,11 @@ before-all = [
     "yum install -y cmake3 gcc-c++ || apt-get update && apt-get install -y cmake g++",
 ]
 before-build = [
-    "cd ../cfd && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ../cfd && cmake --build build --config Release",
+    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
 ]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
 ```
 
 ---
@@ -227,16 +230,19 @@ python -c "import cfd_python; result = cfd_python.run_simulation(5, 5, 3); print
 
 ## Release Process
 
-1. Update version in `cfd_python/__init__.py`
-2. Push to GitHub (triggers automated builds)
-3. Create release tag:
+Version is automatically determined from git tags via setuptools-scm (configured in `pyproject.toml`). Do not manually update version numbers.
+
+1. Ensure all changes are committed and pushed
+2. Create and push a release tag:
 
    ```bash
    git tag v0.3.0
    git push origin v0.3.0
    ```
 
-4. GitHub Actions automatically publishes to PyPI
+3. GitHub Actions automatically builds wheels and publishes to PyPI
+
+The version string is derived from the git tag (e.g., tag `v0.3.0` → version `0.3.0`).
 
 ---
 
