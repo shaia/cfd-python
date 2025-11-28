@@ -4,13 +4,8 @@ This package provides Python bindings for the C-based CFD simulation library,
 enabling high-performance computational fluid dynamics simulations from Python.
 
 Solver types are dynamically discovered from the C library. Use list_solvers()
-to see all available solvers at runtime. Common solvers include:
-    - 'explicit_euler': Basic finite difference solver
-    - 'explicit_euler_optimized': SIMD-optimized solver
-    - 'projection': Pressure-velocity projection solver
-    - 'explicit_euler_gpu': GPU-accelerated Euler solver (if available)
-
-Solver constants (SOLVER_*) are automatically generated from registered solvers.
+to see all available solvers at runtime. Solver constants (SOLVER_*) are
+automatically generated from registered solvers.
 
 Output field types:
     - OUTPUT_PRESSURE: Pressure/velocity magnitude field (VTK)
@@ -30,7 +25,7 @@ try:
         # Package not installed, try C module version
         __version__ = None
 except ImportError:
-    # Python < 3.8 fallback
+    # Fallback for unusual environments where importlib.metadata is unavailable
     __version__ = None
 
 # Core exports that are always available

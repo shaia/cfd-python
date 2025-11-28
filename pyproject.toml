@@ -12,7 +12,7 @@ description = "High-performance CFD simulation library with Python bindings"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "CFD Team", email = "team@example.com"},
+    {name = "CFD Team"},
 ]
 requires-python = ">=3.8"
 keywords = ["cfd", "fluid-dynamics", "simulation", "numerical-methods", "physics"]
@@ -35,12 +35,13 @@ classifiers = [
 ]
 dependencies = []
 
-[project.urls]
-Homepage = "https://github.com/your-org/cfd-python"
-Documentation = "https://cfd-python.readthedocs.io"
-Repository = "https://github.com/your-org/cfd-python.git"
-Issues = "https://github.com/your-org/cfd-python/issues"
-Changelog = "https://github.com/your-org/cfd-python/blob/main/CHANGELOG.md"
+# TODO: Add project URLs before release
+# [project.urls]
+# Homepage = "https://github.com/your-org/cfd-python"
+# Documentation = "https://cfd-python.readthedocs.io"
+# Repository = "https://github.com/your-org/cfd-python.git"
+# Issues = "https://github.com/your-org/cfd-python/issues"
+# Changelog = "https://github.com/your-org/cfd-python/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = [
