@@ -41,19 +41,27 @@ cfd-workspace/
 
 ### CMakeLists.txt
 
-The build system uses `CFD_STATIC_LINK` to control linking:
+The build system uses `CFD_STATIC_LINK` to control linking with platform-specific library names:
 
 ```cmake
 option(CFD_STATIC_LINK "Statically link the CFD library" ON)
 
 if(CFD_STATIC_LINK)
-    # Windows: look for cfd_library_static.lib
-    # Unix: look for libcfd_library.a
-    find_library(CFD_LIBRARY
-        NAMES cfd_library_static cfd_library libcfd_library.a
-        PATHS ${CFD_LIBRARY_DIR}
-        NO_DEFAULT_PATH
-    )
+    if(WIN32)
+        # Windows: look for cfd_library_static.lib or cfd_library.lib
+        find_library(CFD_LIBRARY
+            NAMES cfd_library_static cfd_library
+            PATHS ${CFD_LIBRARY_DIR}
+            NO_DEFAULT_PATH
+        )
+    else()
+        # Unix: look for libcfd_library.a
+        find_library(CFD_LIBRARY
+            NAMES libcfd_library.a cfd_library
+            PATHS ${CFD_LIBRARY_DIR}
+            NO_DEFAULT_PATH
+        )
+    endif()
 endif()
 ```
 
@@ -67,7 +75,10 @@ CMAKE_BUILD_TYPE = "Release"
 CFD_STATIC_LINK = "ON"
 
 [tool.cibuildwheel]
-environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON" }
+# Global environment - static linking for self-contained wheels
+# CFD_ROOT can be set to override the default ../cfd location
+# CFD_USE_STABLE_ABI is enabled for wheel builds to support multiple Python versions
+environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
 ```
 
 ---
