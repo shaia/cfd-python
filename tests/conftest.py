@@ -3,7 +3,6 @@ Pytest configuration and shared fixtures for cfd_python tests.
 """
 
 import pytest
-import sys
 
 
 def pytest_configure(config):

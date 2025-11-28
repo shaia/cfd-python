@@ -426,3 +426,104 @@ class TestInputValidation:
                     xmin=0.0, xmax=1.0,
                     ymin=0.0, ymax=1.0
                 )
+
+    def test_csv_timeseries_non_list_u_raises(self):
+        """Test that non-list u_data raises TypeError."""
+        import cfd_python
+
+        nx, ny = 4, 4
+        size = nx * ny
+        v_data = [0.0] * size
+        p_data = [0.0] * size
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "test.csv")
+            with pytest.raises(TypeError):
+                cfd_python.write_csv_timeseries(
+                    filename=filename,
+                    step=0,
+                    time=0.0,
+                    u_data="not a list",  # Invalid type
+                    v_data=v_data,
+                    p_data=p_data,
+                    nx=nx, ny=ny,
+                    dt=0.001,
+                    iterations=100,
+                    create_new=True
+                )
+
+    def test_csv_timeseries_non_list_v_raises(self):
+        """Test that non-list v_data raises TypeError."""
+        import cfd_python
+
+        nx, ny = 4, 4
+        size = nx * ny
+        u_data = [0.0] * size
+        p_data = [0.0] * size
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "test.csv")
+            with pytest.raises(TypeError):
+                cfd_python.write_csv_timeseries(
+                    filename=filename,
+                    step=0,
+                    time=0.0,
+                    u_data=u_data,
+                    v_data=(1, 2, 3),  # Tuple instead of list
+                    p_data=p_data,
+                    nx=nx, ny=ny,
+                    dt=0.001,
+                    iterations=100,
+                    create_new=True
+                )
+
+    def test_csv_timeseries_non_list_p_raises(self):
+        """Test that non-list p_data raises TypeError."""
+        import cfd_python
+
+        nx, ny = 4, 4
+        size = nx * ny
+        u_data = [0.0] * size
+        v_data = [0.0] * size
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "test.csv")
+            with pytest.raises(TypeError):
+                cfd_python.write_csv_timeseries(
+                    filename=filename,
+                    step=0,
+                    time=0.0,
+                    u_data=u_data,
+                    v_data=v_data,
+                    p_data=None,  # None instead of list
+                    nx=nx, ny=ny,
+                    dt=0.001,
+                    iterations=100,
+                    create_new=True
+                )
+
+    def test_csv_timeseries_wrong_size_raises(self):
+        """Test that wrong data size raises ValueError."""
+        import cfd_python
+
+        nx, ny = 4, 4
+        size = nx * ny
+        u_data = [0.0] * size
+        v_data = [0.0] * size
+        p_data = [0.0] * 5  # Wrong size
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "test.csv")
+            with pytest.raises(ValueError):
+                cfd_python.write_csv_timeseries(
+                    filename=filename,
+                    step=0,
+                    time=0.0,
+                    u_data=u_data,
+                    v_data=v_data,
+                    p_data=p_data,
+                    nx=nx, ny=ny,
+                    dt=0.001,
+                    iterations=100,
+                    create_new=True
+                )

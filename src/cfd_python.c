@@ -638,7 +638,18 @@ static PyObject* write_csv_timeseries_py(PyObject* self, PyObject* args, PyObjec
         return NULL;
     }
 
+    // Validate lists
+    if (!PyList_Check(u_list) || !PyList_Check(v_list) || !PyList_Check(p_list)) {
+        PyErr_SetString(PyExc_TypeError, "u_data, v_data, and p_data must be lists");
+        return NULL;
+    }
+
     size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size ||
+        (size_t)PyList_Size(p_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "data list sizes must match nx*ny");
+        return NULL;
+    }
 
     // Allocate and populate flow field
     FlowField* field = flow_field_create(nx, ny);
@@ -812,7 +823,10 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
     }
 
     // Add version info
-    PyModule_AddStringConstant(m, "__version__", "0.3.0");
+    if (PyModule_AddStringConstant(m, "__version__", "0.3.0") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
 
     // Initialize the solver registry so solvers are available
     solver_registry_init();
@@ -824,29 +838,42 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
     for (int i = 0; i < solver_count; i++) {
         // Convert solver name to uppercase constant name
         // e.g., "explicit_euler" -> "SOLVER_EXPLICIT_EULER"
+        // Buffer: 64 bytes, prefix "SOLVER_" = 7 bytes, max name = 56 bytes
         char const_name[64] = "SOLVER_";
-        size_t prefix_len = 7;
-        size_t j = 0;
-        while (solver_names[i][j] != '\0' && prefix_len + j < 63) {
+        const size_t prefix_len = 7;
+        const size_t max_name_len = sizeof(const_name) - prefix_len - 1;
+        size_t name_len = strlen(solver_names[i]);
+
+        // Skip solver names that are too long (would cause truncation)
+        if (name_len > max_name_len) {
+            continue;
+        }
+
+        for (size_t j = 0; j < name_len; j++) {
             char c = solver_names[i][j];
             if (c >= 'a' && c <= 'z') {
                 const_name[prefix_len + j] = c - 'a' + 'A';  // to uppercase
             } else {
                 const_name[prefix_len + j] = c;
             }
-            j++;
         }
-        const_name[prefix_len + j] = '\0';
-        PyModule_AddStringConstant(m, const_name, solver_names[i]);
+        const_name[prefix_len + name_len] = '\0';
+        if (PyModule_AddStringConstant(m, const_name, solver_names[i]) < 0) {
+            Py_DECREF(m);
+            return NULL;
+        }
     }
 
     // Add output field type constants (these are defined in simulation_api.h enum)
-    PyModule_AddIntConstant(m, "OUTPUT_PRESSURE", OUTPUT_PRESSURE);
-    PyModule_AddIntConstant(m, "OUTPUT_VELOCITY", OUTPUT_VELOCITY);
-    PyModule_AddIntConstant(m, "OUTPUT_FULL_FIELD", OUTPUT_FULL_FIELD);
-    PyModule_AddIntConstant(m, "OUTPUT_CSV_TIMESERIES", OUTPUT_CSV_TIMESERIES);
-    PyModule_AddIntConstant(m, "OUTPUT_CSV_CENTERLINE", OUTPUT_CSV_CENTERLINE);
-    PyModule_AddIntConstant(m, "OUTPUT_CSV_STATISTICS", OUTPUT_CSV_STATISTICS);
+    if (PyModule_AddIntConstant(m, "OUTPUT_PRESSURE", OUTPUT_PRESSURE) < 0 ||
+        PyModule_AddIntConstant(m, "OUTPUT_VELOCITY", OUTPUT_VELOCITY) < 0 ||
+        PyModule_AddIntConstant(m, "OUTPUT_FULL_FIELD", OUTPUT_FULL_FIELD) < 0 ||
+        PyModule_AddIntConstant(m, "OUTPUT_CSV_TIMESERIES", OUTPUT_CSV_TIMESERIES) < 0 ||
+        PyModule_AddIntConstant(m, "OUTPUT_CSV_CENTERLINE", OUTPUT_CSV_CENTERLINE) < 0 ||
+        PyModule_AddIntConstant(m, "OUTPUT_CSV_STATISTICS", OUTPUT_CSV_STATISTICS) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
 
     return m;
 }
