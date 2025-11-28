@@ -92,12 +92,9 @@ target_link_libraries(cfd_python PRIVATE
     ${CFD_LIBRARY}
 )
 
-# On Windows, Python extension modules should not link against Python libraries
-# The symbols are provided by the Python interpreter at runtime
-if(WIN32)
-    target_link_options(cfd_python PRIVATE "/NODEFAULTLIB:python311.lib")
-    target_link_options(cfd_python PRIVATE "/NODEFAULTLIB:python3.lib")
-endif()
+# On Windows with stable ABI, we use python3.dll (abi3) instead of version-specific libraries
+# This is handled automatically by Python_add_library when using Development.Module
+# No additional link exclusions needed - CMake's FindPython handles this correctly
 
 # Install the extension module in the cfd_python package directory
 install(TARGETS cfd_python DESTINATION cfd_python)

@@ -20,9 +20,18 @@ static PyObject* list_solvers(PyObject* self, PyObject* args) {
     const char* names[32];
     int count = simulation_list_solvers(names, 32);
 
-    PyObject* solver_list = PyList_New(count);
+    PyObject* solver_list = PyList_New(0);
+    if (solver_list == NULL) {
+        return NULL;
+    }
     for (int i = 0; i < count; i++) {
-        PyList_SetItem(solver_list, i, PyUnicode_FromString(names[i]));
+        PyObject* name = PyUnicode_FromString(names[i]);
+        if (name == NULL || PyList_Append(solver_list, name) < 0) {
+            Py_XDECREF(name);
+            Py_DECREF(solver_list);
+            return NULL;
+        }
+        Py_DECREF(name);
     }
 
     return solver_list;
@@ -62,34 +71,57 @@ static PyObject* get_solver_info(PyObject* self, PyObject* args) {
     }
 
     PyObject* info = PyDict_New();
-    PyDict_SetItemString(info, "name", PyUnicode_FromString(solver->name));
-    PyDict_SetItemString(info, "description", PyUnicode_FromString(solver->description));
-    PyDict_SetItemString(info, "version", PyUnicode_FromString(solver->version));
+    if (info == NULL) {
+        solver_destroy(solver);
+        return NULL;
+    }
+
+    // Helper macro to add string to dict with proper refcount
+    #define ADD_STRING_TO_DICT(dict, key, value) do { \
+        PyObject* tmp = PyUnicode_FromString(value); \
+        if (tmp == NULL) { Py_DECREF(dict); solver_destroy(solver); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_STRING_TO_DICT(info, "name", solver->name);
+    ADD_STRING_TO_DICT(info, "description", solver->description);
+    ADD_STRING_TO_DICT(info, "version", solver->version);
+
+    #undef ADD_STRING_TO_DICT
 
     // Build capabilities list
     PyObject* caps = PyList_New(0);
-    if (solver->capabilities & SOLVER_CAP_INCOMPRESSIBLE) {
-        PyList_Append(caps, PyUnicode_FromString("incompressible"));
+    if (caps == NULL) {
+        Py_DECREF(info);
+        solver_destroy(solver);
+        return NULL;
     }
-    if (solver->capabilities & SOLVER_CAP_COMPRESSIBLE) {
-        PyList_Append(caps, PyUnicode_FromString("compressible"));
-    }
-    if (solver->capabilities & SOLVER_CAP_STEADY_STATE) {
-        PyList_Append(caps, PyUnicode_FromString("steady_state"));
-    }
-    if (solver->capabilities & SOLVER_CAP_TRANSIENT) {
-        PyList_Append(caps, PyUnicode_FromString("transient"));
-    }
-    if (solver->capabilities & SOLVER_CAP_SIMD) {
-        PyList_Append(caps, PyUnicode_FromString("simd"));
-    }
-    if (solver->capabilities & SOLVER_CAP_PARALLEL) {
-        PyList_Append(caps, PyUnicode_FromString("parallel"));
-    }
-    if (solver->capabilities & SOLVER_CAP_GPU) {
-        PyList_Append(caps, PyUnicode_FromString("gpu"));
-    }
+
+    // Helper macro to append capability string
+    #define APPEND_CAP(list, cap_flag, cap_name) do { \
+        if (solver->capabilities & cap_flag) { \
+            PyObject* s = PyUnicode_FromString(cap_name); \
+            if (s == NULL || PyList_Append(list, s) < 0) { \
+                Py_XDECREF(s); Py_DECREF(list); Py_DECREF(info); \
+                solver_destroy(solver); return NULL; \
+            } \
+            Py_DECREF(s); \
+        } \
+    } while(0)
+
+    APPEND_CAP(caps, SOLVER_CAP_INCOMPRESSIBLE, "incompressible");
+    APPEND_CAP(caps, SOLVER_CAP_COMPRESSIBLE, "compressible");
+    APPEND_CAP(caps, SOLVER_CAP_STEADY_STATE, "steady_state");
+    APPEND_CAP(caps, SOLVER_CAP_TRANSIENT, "transient");
+    APPEND_CAP(caps, SOLVER_CAP_SIMD, "simd");
+    APPEND_CAP(caps, SOLVER_CAP_PARALLEL, "parallel");
+    APPEND_CAP(caps, SOLVER_CAP_GPU, "gpu");
+
+    #undef APPEND_CAP
+
     PyDict_SetItemString(info, "capabilities", caps);
+    Py_DECREF(caps);
 
     solver_destroy(solver);
     return info;
@@ -146,16 +178,27 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
     FlowField* field = sim_data->field;
     double* vel_mag = calculate_velocity_magnitude(field, field->nx, field->ny);
 
-    PyObject* result = NULL;
+    PyObject* result = PyList_New(0);
+    if (result == NULL) {
+        free(vel_mag);
+        free_simulation(sim_data);
+        return NULL;
+    }
+
     if (vel_mag != NULL) {
         size_t size = field->nx * field->ny;
-        result = PyList_New(size);
         for (size_t i = 0; i < size; i++) {
-            PyList_SetItem(result, i, PyFloat_FromDouble(vel_mag[i]));
+            PyObject* val = PyFloat_FromDouble(vel_mag[i]);
+            if (val == NULL || PyList_Append(result, val) < 0) {
+                Py_XDECREF(val);
+                Py_DECREF(result);
+                free(vel_mag);
+                free_simulation(sim_data);
+                return NULL;
+            }
+            Py_DECREF(val);
         }
         free(vel_mag);
-    } else {
-        result = PyList_New(0);
     }
 
     free_simulation(sim_data);
@@ -184,27 +227,69 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
 
     // Return grid information as a dictionary
     PyObject* grid_dict = PyDict_New();
-    PyDict_SetItemString(grid_dict, "nx", PyLong_FromSize_t(grid->nx));
-    PyDict_SetItemString(grid_dict, "ny", PyLong_FromSize_t(grid->ny));
-    PyDict_SetItemString(grid_dict, "xmin", PyFloat_FromDouble(grid->xmin));
-    PyDict_SetItemString(grid_dict, "xmax", PyFloat_FromDouble(grid->xmax));
-    PyDict_SetItemString(grid_dict, "ymin", PyFloat_FromDouble(grid->ymin));
-    PyDict_SetItemString(grid_dict, "ymax", PyFloat_FromDouble(grid->ymax));
+    if (grid_dict == NULL) {
+        grid_destroy(grid);
+        return NULL;
+    }
+
+    // Helper macro to add values to dict with proper refcount
+    #define ADD_TO_DICT(dict, key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); grid_destroy(grid); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_TO_DICT(grid_dict, "nx", PyLong_FromSize_t(grid->nx));
+    ADD_TO_DICT(grid_dict, "ny", PyLong_FromSize_t(grid->ny));
+    ADD_TO_DICT(grid_dict, "xmin", PyFloat_FromDouble(grid->xmin));
+    ADD_TO_DICT(grid_dict, "xmax", PyFloat_FromDouble(grid->xmax));
+    ADD_TO_DICT(grid_dict, "ymin", PyFloat_FromDouble(grid->ymin));
+    ADD_TO_DICT(grid_dict, "ymax", PyFloat_FromDouble(grid->ymax));
+
+    #undef ADD_TO_DICT
 
     // Create coordinate lists
-    PyObject* x_list = PyList_New(grid->nx);
-    PyObject* y_list = PyList_New(grid->ny);
+    PyObject* x_list = PyList_New(0);
+    PyObject* y_list = PyList_New(0);
+    if (x_list == NULL || y_list == NULL) {
+        Py_XDECREF(x_list);
+        Py_XDECREF(y_list);
+        Py_DECREF(grid_dict);
+        grid_destroy(grid);
+        return NULL;
+    }
 
     for (size_t i = 0; i < grid->nx; i++) {
-        PyList_SetItem(x_list, i, PyFloat_FromDouble(grid->x[i]));
+        PyObject* val = PyFloat_FromDouble(grid->x[i]);
+        if (val == NULL || PyList_Append(x_list, val) < 0) {
+            Py_XDECREF(val);
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(grid);
+            return NULL;
+        }
+        Py_DECREF(val);
     }
 
     for (size_t i = 0; i < grid->ny; i++) {
-        PyList_SetItem(y_list, i, PyFloat_FromDouble(grid->y[i]));
+        PyObject* val = PyFloat_FromDouble(grid->y[i]);
+        if (val == NULL || PyList_Append(y_list, val) < 0) {
+            Py_XDECREF(val);
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(grid);
+            return NULL;
+        }
+        Py_DECREF(val);
     }
 
     PyDict_SetItemString(grid_dict, "x_coords", x_list);
     PyDict_SetItemString(grid_dict, "y_coords", y_list);
+    Py_DECREF(x_list);
+    Py_DECREF(y_list);
 
     grid_destroy(grid);
     return grid_dict;
@@ -219,13 +304,27 @@ static PyObject* get_default_solver_params(PyObject* self, PyObject* args) {
     SolverParams params = solver_params_default();
 
     PyObject* params_dict = PyDict_New();
-    PyDict_SetItemString(params_dict, "dt", PyFloat_FromDouble(params.dt));
-    PyDict_SetItemString(params_dict, "cfl", PyFloat_FromDouble(params.cfl));
-    PyDict_SetItemString(params_dict, "gamma", PyFloat_FromDouble(params.gamma));
-    PyDict_SetItemString(params_dict, "mu", PyFloat_FromDouble(params.mu));
-    PyDict_SetItemString(params_dict, "k", PyFloat_FromDouble(params.k));
-    PyDict_SetItemString(params_dict, "max_iter", PyLong_FromLong(params.max_iter));
-    PyDict_SetItemString(params_dict, "tolerance", PyFloat_FromDouble(params.tolerance));
+    if (params_dict == NULL) {
+        return NULL;
+    }
+
+    // Helper macro to add values to dict with proper refcount
+    #define ADD_TO_DICT(dict, key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_TO_DICT(params_dict, "dt", PyFloat_FromDouble(params.dt));
+    ADD_TO_DICT(params_dict, "cfl", PyFloat_FromDouble(params.cfl));
+    ADD_TO_DICT(params_dict, "gamma", PyFloat_FromDouble(params.gamma));
+    ADD_TO_DICT(params_dict, "mu", PyFloat_FromDouble(params.mu));
+    ADD_TO_DICT(params_dict, "k", PyFloat_FromDouble(params.k));
+    ADD_TO_DICT(params_dict, "max_iter", PyLong_FromLong(params.max_iter));
+    ADD_TO_DICT(params_dict, "tolerance", PyFloat_FromDouble(params.tolerance));
+
+    #undef ADD_TO_DICT
 
     return params_dict;
 }
@@ -283,36 +382,80 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
 
     if (vel_mag != NULL) {
         size_t size = field->nx * field->ny;
-        PyObject* vel_list = PyList_New(size);
+        PyObject* vel_list = PyList_New(0);
+        if (vel_list == NULL) {
+            free(vel_mag);
+            Py_DECREF(results);
+            free_simulation(sim_data);
+            return NULL;
+        }
         for (size_t i = 0; i < size; i++) {
-            PyList_SetItem(vel_list, i, PyFloat_FromDouble(vel_mag[i]));
+            PyObject* val = PyFloat_FromDouble(vel_mag[i]);
+            if (val == NULL || PyList_Append(vel_list, val) < 0) {
+                Py_XDECREF(val);
+                Py_DECREF(vel_list);
+                Py_DECREF(results);
+                free(vel_mag);
+                free_simulation(sim_data);
+                return NULL;
+            }
+            Py_DECREF(val);
         }
         PyDict_SetItemString(results, "velocity_magnitude", vel_list);
+        Py_DECREF(vel_list);
         free(vel_mag);
     }
 
+    // Helper macro to add values to dict with proper refcount
+    #define ADD_TO_DICT(dict, key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); free_simulation(sim_data); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
     // Add simulation info
-    PyDict_SetItemString(results, "nx", PyLong_FromSize_t(nx));
-    PyDict_SetItemString(results, "ny", PyLong_FromSize_t(ny));
-    PyDict_SetItemString(results, "steps", PyLong_FromSize_t(steps));
+    ADD_TO_DICT(results, "nx", PyLong_FromSize_t(nx));
+    ADD_TO_DICT(results, "ny", PyLong_FromSize_t(ny));
+    ADD_TO_DICT(results, "steps", PyLong_FromSize_t(steps));
 
     // Add solver info
     Solver* solver = simulation_get_solver(sim_data);
     if (solver) {
-        PyDict_SetItemString(results, "solver_name", PyUnicode_FromString(solver->name));
-        PyDict_SetItemString(results, "solver_description", PyUnicode_FromString(solver->description));
+        ADD_TO_DICT(results, "solver_name", PyUnicode_FromString(solver->name));
+        ADD_TO_DICT(results, "solver_description", PyUnicode_FromString(solver->description));
     }
 
     // Add solver statistics
     const SolverStats* stats = simulation_get_stats(sim_data);
     if (stats) {
         PyObject* stats_dict = PyDict_New();
-        PyDict_SetItemString(stats_dict, "iterations", PyLong_FromLong(stats->iterations));
-        PyDict_SetItemString(stats_dict, "max_velocity", PyFloat_FromDouble(stats->max_velocity));
-        PyDict_SetItemString(stats_dict, "max_pressure", PyFloat_FromDouble(stats->max_pressure));
-        PyDict_SetItemString(stats_dict, "elapsed_time_ms", PyFloat_FromDouble(stats->elapsed_time_ms));
+        if (stats_dict == NULL) {
+            Py_DECREF(results);
+            free_simulation(sim_data);
+            return NULL;
+        }
+
+        // Use a local macro for stats_dict
+        #define ADD_TO_STATS(key, py_val) do { \
+            PyObject* tmp = (py_val); \
+            if (tmp == NULL) { Py_DECREF(stats_dict); Py_DECREF(results); free_simulation(sim_data); return NULL; } \
+            PyDict_SetItemString(stats_dict, key, tmp); \
+            Py_DECREF(tmp); \
+        } while(0)
+
+        ADD_TO_STATS("iterations", PyLong_FromLong(stats->iterations));
+        ADD_TO_STATS("max_velocity", PyFloat_FromDouble(stats->max_velocity));
+        ADD_TO_STATS("max_pressure", PyFloat_FromDouble(stats->max_pressure));
+        ADD_TO_STATS("elapsed_time_ms", PyFloat_FromDouble(stats->elapsed_time_ms));
+
+        #undef ADD_TO_STATS
+
         PyDict_SetItemString(results, "stats", stats_dict);
+        Py_DECREF(stats_dict);
     }
+
+    #undef ADD_TO_DICT
 
     // Write output if requested
     if (output_file) {
@@ -320,7 +463,11 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
                             sim_data->grid->nx, sim_data->grid->ny,
                             sim_data->grid->xmin, sim_data->grid->xmax,
                             sim_data->grid->ymin, sim_data->grid->ymax);
-        PyDict_SetItemString(results, "output_file", PyUnicode_FromString(output_file));
+        PyObject* output_str = PyUnicode_FromString(output_file);
+        if (output_str != NULL) {
+            PyDict_SetItemString(results, "output_file", output_str);
+            Py_DECREF(output_str);
+        }
     }
 
     free_simulation(sim_data);
@@ -382,6 +529,10 @@ static PyObject* write_vtk_scalar(PyObject* self, PyObject* args, PyObject* kwds
 
     for (size_t i = 0; i < size; i++) {
         PyObject* item = PyList_GetItem(data_list, i);
+        if (item == NULL) {
+            free(data);
+            return NULL;
+        }
         data[i] = PyFloat_AsDouble(item);
         if (PyErr_Occurred()) {
             free(data);
@@ -427,8 +578,11 @@ static PyObject* write_vtk_vector(PyObject* self, PyObject* args, PyObject* kwds
         return NULL;
     }
 
-    double* u_data = (double*)malloc(size * sizeof(double));
-    double* v_data = (double*)malloc(size * sizeof(double));
+    double* u_data = NULL;
+    double* v_data = NULL;
+
+    u_data = (double*)malloc(size * sizeof(double));
+    v_data = (double*)malloc(size * sizeof(double));
     if (u_data == NULL || v_data == NULL) {
         free(u_data);
         free(v_data);
@@ -437,8 +591,15 @@ static PyObject* write_vtk_vector(PyObject* self, PyObject* args, PyObject* kwds
     }
 
     for (size_t i = 0; i < size; i++) {
-        u_data[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
-        v_data[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        PyObject* u_item = PyList_GetItem(u_list, i);
+        PyObject* v_item = PyList_GetItem(v_list, i);
+        if (u_item == NULL || v_item == NULL) {
+            free(u_data);
+            free(v_data);
+            return NULL;
+        }
+        u_data[i] = PyFloat_AsDouble(u_item);
+        v_data[i] = PyFloat_AsDouble(v_item);
         if (PyErr_Occurred()) {
             free(u_data);
             free(v_data);
@@ -487,9 +648,16 @@ static PyObject* write_csv_timeseries_py(PyObject* self, PyObject* args, PyObjec
     }
 
     for (size_t i = 0; i < size; i++) {
-        field->u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
-        field->v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
-        field->p[i] = PyFloat_AsDouble(PyList_GetItem(p_list, i));
+        PyObject* u_item = PyList_GetItem(u_list, i);
+        PyObject* v_item = PyList_GetItem(v_list, i);
+        PyObject* p_item = PyList_GetItem(p_list, i);
+        if (u_item == NULL || v_item == NULL || p_item == NULL) {
+            flow_field_destroy(field);
+            return NULL;
+        }
+        field->u[i] = PyFloat_AsDouble(u_item);
+        field->v[i] = PyFloat_AsDouble(v_item);
+        field->p[i] = PyFloat_AsDouble(p_item);
         if (PyErr_Occurred()) {
             flow_field_destroy(field);
             return NULL;
@@ -522,7 +690,7 @@ static PyMethodDef cfd_python_methods[] = {
      "    xmax (float, optional): Maximum x coordinate (default: 1.0)\n"
      "    ymin (float, optional): Minimum y coordinate (default: 0.0)\n"
      "    ymax (float, optional): Maximum y coordinate (default: 1.0)\n"
-     "    solver_type (str, optional): Solver type name (default: 'explicit_euler')\n"
+     "    solver_type (str, optional): Solver type name (uses library default if not specified)\n"
      "    output_file (str, optional): VTK output file path\n\n"
      "Returns:\n"
      "    list: Velocity magnitude values as a flat list"},
