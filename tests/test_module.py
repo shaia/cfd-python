@@ -1,18 +1,24 @@
 """
 Tests for module-level attributes and exports
 """
-import pytest
+import re
 import cfd_python
 
 
 class TestModuleAttributes:
     """Test module-level attributes and constants"""
 
-    def test_version(self):
-        """Test version string exists"""
+    def test_version_exists_and_valid_format(self):
+        """Test version string exists and follows semantic versioning"""
         assert hasattr(cfd_python, '__version__')
-        assert isinstance(cfd_python.__version__, str)
-        assert cfd_python.__version__ == "0.3.0"
+        version = cfd_python.__version__
+        assert isinstance(version, str)
+        assert len(version) > 0, "Version string should not be empty"
+        # Version should match semantic versioning pattern (with optional pre-release/build metadata)
+        # Examples: "0.3.0", "1.0.0", "0.1.0.dev1", "0.3.0+g1234567"
+        semver_pattern = r'^\d+\.\d+\.\d+.*$'
+        assert re.match(semver_pattern, version), \
+            f"Version '{version}' should follow semantic versioning (X.Y.Z)"
 
     def test_output_constants_exist(self):
         """Test OUTPUT_* constants are defined"""

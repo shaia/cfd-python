@@ -67,20 +67,25 @@ class TestIntegration:
         for r in results:
             assert len(r) == 64
 
-    def test_different_solvers_same_problem(self):
-        """Test running same problem with different solvers"""
+    @pytest.mark.parametrize("solver_index", range(10))  # Support up to 10 solvers
+    def test_solver_produces_valid_output(self, solver_index):
+        """Test that each available solver produces valid simulation output.
+
+        Uses parametrize to test each solver individually, making it easy to
+        identify which solver fails and to run individual solver tests.
+        """
         solvers = cfd_python.list_solvers()
 
-        results = {}
-        for solver_name in solvers[:2]:  # Test first two solvers
-            result = cfd_python.run_simulation(
-                5, 5, steps=3, solver_type=solver_name
-            )
-            results[solver_name] = result
+        if solver_index >= len(solvers):
+            pytest.skip(f"Solver index {solver_index} not available (only {len(solvers)} solvers)")
 
-        # All results should have correct size
-        for name, result in results.items():
-            assert len(result) == 25, f"Solver {name} returned wrong size"
+        solver_name = solvers[solver_index]
+        result = cfd_python.run_simulation(
+            5, 5, steps=3, solver_type=solver_name
+        )
+
+        assert len(result) == 25, f"Solver {solver_name} returned wrong size"
+        assert all(isinstance(v, float) for v in result), f"Solver {solver_name} returned non-float values"
 
     def test_output_workflow(self, tmp_path):
         """Test complete output workflow"""

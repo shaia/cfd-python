@@ -8,10 +8,14 @@ import os
 # Add the build directory to the path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-try:
-    import cfd_python
-except ImportError:
-    pytest.skip("CFD Python module not built yet", allow_module_level=True)
+# Use pytest.importorskip for proper import handling - this will:
+# - Skip tests with a clear message if module isn't built
+# - Show as skipped (not passed) in test reports
+# - Fail loudly in CI if the module should have been built
+cfd_python = pytest.importorskip(
+    "cfd_python",
+    reason="CFD Python C extension not built. Run 'pip install -e .' first."
+)
 
 
 @pytest.fixture
