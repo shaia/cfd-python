@@ -1,3 +1,9 @@
+// Py_LIMITED_API should be defined via build system (CMake) before including Python.h
+// for stable ABI support. The CMake option CFD_USE_STABLE_ABI controls this.
+// When enabled, it targets Python 3.8+ stable ABI (0x03080000) for binary compatibility
+// across Python versions. Do NOT define it here unconditionally as it requires linking
+// against python3.lib which may not be available in all environments.
+
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdio.h>
@@ -375,6 +381,10 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
 
     // Create results dictionary
     PyObject* results = PyDict_New();
+    if (results == NULL) {
+        free_simulation(sim_data);
+        return NULL;
+    }
 
     // Get velocity magnitude
     FlowField* field = sim_data->field;

@@ -12,7 +12,7 @@ option(CFD_USE_STABLE_ABI "Use Python stable ABI (abi3)" OFF)
 find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Enable stable ABI (abi3) for Python 3.8+ if requested
-if(CFD_USE_STABLE_ABI AND ${Python_VERSION} VERSION_GREATER_EQUAL "3.8")
+if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
     set(CMAKE_C_VISIBILITY_PRESET hidden)
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
     add_definitions(-DPy_LIMITED_API=0x03080000)
@@ -84,7 +84,7 @@ set_target_properties(cfd_python PROPERTIES
 )
 
 # Use stable ABI if requested and available
-if(CFD_USE_STABLE_ABI AND ${Python_VERSION} VERSION_GREATER_EQUAL "3.8")
+if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
     target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
 endif()
 

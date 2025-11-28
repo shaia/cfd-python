@@ -21,7 +21,17 @@ Output field types:
     - OUTPUT_CSV_STATISTICS: Global statistics (CSV)
 """
 
-__version__ = "0.3.0"
+# Get version from package metadata (setuptools-scm) or fall back to C module
+try:
+    from importlib.metadata import version, PackageNotFoundError
+    try:
+        __version__ = version("cfd-python")
+    except PackageNotFoundError:
+        # Package not installed, try C module version
+        __version__ = None
+except ImportError:
+    # Python < 3.8 fallback
+    __version__ = None
 
 # Core exports that are always available
 _CORE_EXPORTS = [
@@ -76,6 +86,10 @@ try:
     # Import the C extension module to access dynamic solver constants
     from . import cfd_python as _cfd_module
 
+    # Fall back to C module version if metadata lookup failed
+    if __version__ is None:
+        __version__ = getattr(_cfd_module, '__version__', '0.0.0')
+
     # Dynamically export all SOLVER_* constants from the C module
     # This allows new solvers to be automatically available without
     # updating this file
@@ -91,3 +105,5 @@ try:
 except ImportError:
     # Development mode - module not yet built
     __all__ = _CORE_EXPORTS
+    if __version__ is None:
+        __version__ = "0.0.0-dev"

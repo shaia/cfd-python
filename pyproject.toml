@@ -104,9 +104,8 @@ environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_ST
 [tool.cibuildwheel.windows]
 # Windows-specific configuration
 # Build CFD library first (static), then build Python extension
-# CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
+# CFD_ROOT is set in environment below
 before-build = [
-    "if not defined CFD_ROOT set CFD_ROOT=../cfd",
     "cd %CFD_ROOT% && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
     "cd %CFD_ROOT% && cmake --build build --config Release",
 ]
