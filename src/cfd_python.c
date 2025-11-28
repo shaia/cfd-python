@@ -856,6 +856,11 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
 
         // Skip solver names that are too long (would cause truncation)
         if (name_len > max_name_len) {
+            char warn_msg[128];
+            snprintf(warn_msg, sizeof(warn_msg),
+                     "Solver name '%s' exceeds maximum length (%zu > %zu), skipping constant export",
+                     solver_names[i], name_len, max_name_len);
+            PyErr_WarnEx(PyExc_RuntimeWarning, warn_msg, 1);
             continue;
         }
 

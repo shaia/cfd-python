@@ -96,8 +96,8 @@ class TestWriteVtkScalar:
 class TestWriteVtkVector:
     """Test the write_vtk_vector function.
 
-    This specifically tests the code path with the fixed use-after-free bug
-    where u_data and v_data pointers were not initialized to NULL.
+    This also verifies the fix for a previous use-after-free bug where
+    u_data and v_data pointers were not initialized to NULL before allocation.
     """
 
     def test_write_vtk_vector_basic(self):
