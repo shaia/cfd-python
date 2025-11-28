@@ -1,0 +1,218 @@
+name: Build and Test Wheels
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main, master]
+  release:
+    types: [published]
+  # Allow triggering from cfd repo or manually
+  workflow_dispatch:
+    inputs:
+      cfd_ref:
+        description: "CFD library ref (tag/branch/commit). Leave empty to auto-detect."
+        required: false
+        default: ""
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Determine which version of CFD library to use
+      # Priority: workflow_dispatch input > release tag > push tag > main branch
+      - name: Determine CFD library version
+        id: cfd-version
+        shell: bash
+        run: |
+          # Check for workflow_dispatch input first
+          if [[ -n "${{ github.event.inputs.cfd_ref }}" ]]; then
+            echo "ref=${{ github.event.inputs.cfd_ref }}" >> $GITHUB_OUTPUT
+            echo "Using CFD library ref from input: ${{ github.event.inputs.cfd_ref }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            # Use the release tag
+            echo "ref=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "Using CFD library tag: ${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Push of a tag
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "ref=$TAG" >> $GITHUB_OUTPUT
+            echo "Using CFD library tag: $TAG"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual trigger without input - use the current ref
+            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "Using CFD library ref matching current branch/tag: ${{ github.ref_name }}"
+          else
+            # For PR/push to branch, use main
+            echo "ref=main" >> $GITHUB_OUTPUT
+            echo "Using CFD library branch: main"
+          fi
+
+      # Checkout the CFD C library (sibling repository)
+      - name: Checkout CFD C library
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/cfd
+          path: ../cfd
+          ref: ${{ steps.cfd-version.outputs.ref }}
+          fetch-depth: 0
+
+      # Build CFD C library (static)
+      - name: Build CFD C library (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd ../cfd
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build build --config Release
+
+      - name: Build CFD C library (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd ..\cfd
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build build --config Release
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
+          CIBW_SKIP: "*-musllinux_* pp*"
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_ARCHS_LINUX: x86_64
+
+          # Environment for static linking
+          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON"
+
+          # Test the built wheels
+          CIBW_TEST_COMMAND: >
+            python -c "import cfd_python; print('CFD Python version:', cfd_python.__version__); print('Solvers:', cfd_python.list_solvers())"
+
+          # macOS wheel repair (static linking handles most deps)
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}
+
+          # Linux wheel repair
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
+
+          # Windows - no repair needed with static linking
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: ""
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  test_package:
+    name: Test package installation
+    needs: [build_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse
+
+      - name: Install wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --find-links wheelhouse cfd-python
+
+      - name: Test import and version
+        run: |
+          python -c "import cfd_python; print('Version:', cfd_python.__version__)"
+
+      - name: Test solver discovery
+        run: |
+          python -c "import cfd_python; solvers = cfd_python.list_solvers(); print('Solvers:', solvers); assert len(solvers) > 0"
+
+      - name: Test simulation
+        run: |
+          python -c "import cfd_python; result = cfd_python.run_simulation(5, 5, steps=3); assert len(result) == 25; print('Simulation OK')"
+
+      - name: Test grid creation
+        run: |
+          python -c "import cfd_python; grid = cfd_python.create_grid(5, 5, 0, 1, 0, 1); assert grid['nx'] == 5; print('Grid OK')"
+
+      - name: Test solver params
+        run: |
+          python -c "import cfd_python; params = cfd_python.get_default_solver_params(); assert 'dt' in params; print('Params OK')"
+
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist, test_package]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cfd-python
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  upload_test_pypi:
+    name: Upload to Test PyPI
+    needs: [build_wheels, build_sdist, test_package]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/cfd-python
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
