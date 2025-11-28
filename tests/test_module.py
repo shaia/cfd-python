@@ -9,16 +9,18 @@ class TestModuleAttributes:
     """Test module-level attributes and constants"""
 
     def test_version_exists_and_valid_format(self):
-        """Test version string exists and follows semantic versioning"""
+        """Test version string exists and follows a valid version format"""
         assert hasattr(cfd_python, '__version__')
         version = cfd_python.__version__
         assert isinstance(version, str)
         assert len(version) > 0, "Version string should not be empty"
-        # Version should match semantic versioning pattern (with optional pre-release/build metadata)
-        # Examples: "0.3.0", "1.0.0", "0.1.0.dev1", "0.3.0+g1234567"
-        semver_pattern = r'^\d+\.\d+\.\d+.*$'
-        assert re.match(semver_pattern, version), \
-            f"Version '{version}' should follow semantic versioning (X.Y.Z)"
+        # Version should match either:
+        # - Semantic versioning: X.Y.Z (with optional pre-release/build metadata)
+        # - setuptools-scm dev version: X.Y.devN+gHASH (for development builds)
+        # Examples: "0.3.0", "1.0.0", "0.1.0.dev1", "0.3.0+g1234567", "0.1.dev6+g4bf1eb6"
+        version_pattern = r'^\d+\.\d+(\.\d+)?.*$'
+        assert re.match(version_pattern, version), \
+            f"Version '{version}' should follow versioning format (X.Y or X.Y.Z)"
 
     def test_output_constants_exist(self):
         """Test OUTPUT_* constants are defined"""
