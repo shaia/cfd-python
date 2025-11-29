@@ -33,8 +33,8 @@ Make sure the package is installed first:
 # Install in development mode
 pip install -e .
 
-# Or using build.py
-python build.py develop
+# Or using dev_build.py
+python dev_build.py develop
 ```
 
 Then run any example:
