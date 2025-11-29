@@ -70,15 +70,26 @@ jobs:
           fetch-depth: 0
 
       # Build wheels using cibuildwheel
-      # The before-build commands in pyproject.toml will build the CFD library
+      # We override both environment and before-build for each platform since
+      # pyproject.toml has platform-specific settings that use ../cfd (for local dev)
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
-          # CIBW_ENVIRONMENT completely replaces (not merges with) the environment
-          # settings in pyproject.toml, including platform-specific ones.
-          # We must specify all required variables here for CI builds.
-          # CFD_ROOT=./src/cfd_lib points to the cfd checkout inside source tree.
+          # Override environment for all platforms - CFD_ROOT points to checkout inside source tree
           CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
+          CIBW_ENVIRONMENT_LINUX: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
+          CIBW_ENVIRONMENT_MACOS: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
+          CIBW_ENVIRONMENT_WINDOWS: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
+          # Override before-build to use the correct CFD_ROOT path
+          CIBW_BEFORE_BUILD_LINUX: >
+            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON &&
+            cmake --build ./src/cfd_lib/build --config Release
+          CIBW_BEFORE_BUILD_MACOS: >
+            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF &&
+            cmake --build ./src/cfd_lib/build --config Release
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF &&
+            cmake --build ./src/cfd_lib/build --config Release
 
       - uses: actions/upload-artifact@v4
         with:
