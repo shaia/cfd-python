@@ -75,13 +75,15 @@ minimum-version = "0.4"
 build-dir = "build/{wheel_tag}"
 
 # Build stable ABI wheels for CPython 3.8+
+# This creates cp38-abi3 wheels that work with Python 3.8+
+wheel.py-api = "cp38"
 wheel.expand-macos-universal-tags = true
 
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 CFD_STATIC_LINK = "ON"
-# Note: CFD_USE_STABLE_ABI and CFD_ROOT are passed via environment variables
-# from cibuildwheel (CIBW_ENVIRONMENT) since they differ between local dev and CI
+CFD_USE_STABLE_ABI = "ON"
+# Note: CFD_ROOT is passed via CIBW_ENVIRONMENT since it differs between local dev and CI
 
 [tool.scikit-build.metadata]
 [tool.scikit-build.metadata.version]
