@@ -4,6 +4,9 @@ Integration tests for complete workflows
 import pytest
 import cfd_python
 
+# Get solver list at module load time for parametrization
+_AVAILABLE_SOLVERS = cfd_python.list_solvers()
+
 
 class TestIntegration:
     """Integration tests for complete workflows"""
@@ -67,19 +70,9 @@ class TestIntegration:
         for r in results:
             assert len(r) == 64
 
-    @pytest.mark.parametrize("solver_index", range(10))  # Support up to 10 solvers
-    def test_solver_produces_valid_output(self, solver_index):
-        """Test that each available solver produces valid simulation output.
-
-        Uses parametrize to test each solver individually, making it easy to
-        identify which solver fails and to run individual solver tests.
-        """
-        solvers = cfd_python.list_solvers()
-
-        if solver_index >= len(solvers):
-            pytest.skip(f"Solver index {solver_index} not available (only {len(solvers)} solvers)")
-
-        solver_name = solvers[solver_index]
+    @pytest.mark.parametrize("solver_name", _AVAILABLE_SOLVERS)
+    def test_solver_produces_valid_output(self, solver_name):
+        """Test that each available solver produces valid simulation output."""
         result = cfd_python.run_simulation(
             5, 5, steps=3, solver_type=solver_name
         )

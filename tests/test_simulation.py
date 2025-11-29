@@ -56,7 +56,7 @@ class TestSolverParams:
         params = cfd_python.get_default_solver_params()
         assert 'cfl' in params
         assert isinstance(params['cfl'], float)
-        assert 0 < params['cfl'] < 1
+        assert 0 < params['cfl'] <= 1  # CFL=1.0 is valid for some schemes
 
     def test_default_params_has_all_keys(self):
         """Test default params contains all expected keys"""

@@ -2,8 +2,6 @@
 Tests for VTK and CSV output functions
 """
 import pytest
-import os
-import tempfile
 import cfd_python
 
 
@@ -24,20 +22,14 @@ class TestVTKOutput:
         assert output_file.exists()
         assert output_file.stat().st_size > 0
 
-    def test_write_vtk_scalar_validates_size(self):
+    def test_write_vtk_scalar_validates_size(self, tmp_path):
         """Test write_vtk_scalar validates data size"""
-        with tempfile.NamedTemporaryFile(suffix='.vtk', delete=False) as f:
-            output_file = f.name
-
-        try:
-            with pytest.raises(ValueError):
-                cfd_python.write_vtk_scalar(
-                    output_file, "test", [1.0, 2.0, 3.0],  # 3 elements
-                    5, 5, 0.0, 1.0, 0.0, 1.0  # expects 25 elements
-                )
-        finally:
-            if os.path.exists(output_file):
-                os.unlink(output_file)
+        output_file = tmp_path / "test.vtk"
+        with pytest.raises(ValueError):
+            cfd_python.write_vtk_scalar(
+                str(output_file), "test", [1.0, 2.0, 3.0],  # 3 elements
+                5, 5, 0.0, 1.0, 0.0, 1.0  # expects 25 elements
+            )
 
     def test_write_vtk_vector(self, tmp_path):
         """Test write_vtk_vector creates file"""
@@ -54,22 +46,16 @@ class TestVTKOutput:
         assert output_file.exists()
         assert output_file.stat().st_size > 0
 
-    def test_write_vtk_vector_validates_size(self):
+    def test_write_vtk_vector_validates_size(self, tmp_path):
         """Test write_vtk_vector validates data sizes"""
-        with tempfile.NamedTemporaryFile(suffix='.vtk', delete=False) as f:
-            output_file = f.name
-
-        try:
-            with pytest.raises(ValueError):
-                cfd_python.write_vtk_vector(
-                    output_file, "test",
-                    [1.0, 2.0],  # 2 elements
-                    [1.0, 2.0, 3.0],  # 3 elements
-                    5, 5, 0.0, 1.0, 0.0, 1.0
-                )
-        finally:
-            if os.path.exists(output_file):
-                os.unlink(output_file)
+        output_file = tmp_path / "test.vtk"
+        with pytest.raises(ValueError):
+            cfd_python.write_vtk_vector(
+                str(output_file), "test",
+                [1.0, 2.0],  # 2 elements
+                [1.0, 2.0, 3.0],  # 3 elements
+                5, 5, 0.0, 1.0, 0.0, 1.0
+            )
 
 
 class TestCSVOutput:
