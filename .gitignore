@@ -144,6 +144,10 @@ _deps/
 # Build directories
 _skbuild/
 *.egg-info/
+wheelhouse/
+
+# Local copy of CFD library (created during builds)
+src/cfd_lib/
 
 # VTK output files
 *.vtk
