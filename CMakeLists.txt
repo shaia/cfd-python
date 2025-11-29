@@ -31,9 +31,10 @@ message(STATUS "CFD_ROOT env: $ENV{CFD_ROOT}")
 find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Enable stable ABI (abi3) for Python 3.8+ if requested
+# Note: We do NOT set CMAKE_C_VISIBILITY_PRESET to hidden here because
+# Python_add_library handles visibility correctly, and setting hidden globally
+# can cause PyInit_* symbols to be hidden even when PyMODINIT_FUNC is used.
 if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
-    set(CMAKE_C_VISIBILITY_PRESET hidden)
-    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
     add_definitions(-DPy_LIMITED_API=0x03080000)
     message(STATUS "Using Python stable ABI (abi3)")
 endif()
@@ -103,11 +104,12 @@ Python_add_library(cfd_python MODULE WITH_SOABI
     src/cfd_python.c
 )
 
-# Set properties for stable ABI
+# Set properties for the extension module
+# Note: INTERPROCEDURAL_OPTIMIZATION (LTO) is disabled because it can cause
+# the PyInit_* symbol to be stripped on some platforms/compilers
 set_target_properties(cfd_python PROPERTIES
     C_STANDARD 11
     CXX_STANDARD 17
-    INTERPROCEDURAL_OPTIMIZATION ON
 )
 
 # Use stable ABI if requested and available
