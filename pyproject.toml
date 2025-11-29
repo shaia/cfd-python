@@ -109,7 +109,7 @@ environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_ST
 # Only build 64-bit wheels (AMD64) - skip x86 (32-bit)
 archs = ["AMD64"]
 before-build = [
-    "cmake -S %CFD_ROOT% -B %CFD_ROOT%/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cmake -S %CFD_ROOT% -B %CFD_ROOT%/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
     "cmake --build %CFD_ROOT%/build --config Release",
 ]
 

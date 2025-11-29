@@ -112,6 +112,12 @@ set_target_properties(cfd_python PROPERTIES
     CXX_STANDARD 17
 )
 
+# On Windows, use static MSVC runtime to avoid vcruntime DLL dependencies
+if(WIN32 AND MSVC)
+    set_property(TARGET cfd_python PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # Use stable ABI if requested and available
 if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
     target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
