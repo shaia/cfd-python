@@ -3,10 +3,29 @@ cmake_minimum_required(VERSION 3.15...3.27)
 project(cfd_python LANGUAGES C CXX)
 
 # Option to control static vs dynamic linking
-option(CFD_STATIC_LINK "Statically link the CFD library" ON)
+# Can be set via CMake option or CFD_STATIC_LINK environment variable
+if(DEFINED ENV{CFD_STATIC_LINK})
+    set(CFD_STATIC_LINK_DEFAULT $ENV{CFD_STATIC_LINK})
+else()
+    set(CFD_STATIC_LINK_DEFAULT ON)
+endif()
+option(CFD_STATIC_LINK "Statically link the CFD library" ${CFD_STATIC_LINK_DEFAULT})
 
-# Option to disable stable ABI (useful for development with Windows Store Python)
-option(CFD_USE_STABLE_ABI "Use Python stable ABI (abi3)" OFF)
+# Option to enable stable ABI (useful for wheel builds)
+# Can be set via CMake option or CFD_USE_STABLE_ABI environment variable
+if(DEFINED ENV{CFD_USE_STABLE_ABI})
+    set(CFD_USE_STABLE_ABI_DEFAULT $ENV{CFD_USE_STABLE_ABI})
+else()
+    set(CFD_USE_STABLE_ABI_DEFAULT OFF)
+endif()
+option(CFD_USE_STABLE_ABI "Use Python stable ABI (abi3)" ${CFD_USE_STABLE_ABI_DEFAULT})
+
+# Debug output for build configuration
+message(STATUS "CFD_STATIC_LINK: ${CFD_STATIC_LINK}")
+message(STATUS "CFD_USE_STABLE_ABI: ${CFD_USE_STABLE_ABI}")
+message(STATUS "CFD_STATIC_LINK env: $ENV{CFD_STATIC_LINK}")
+message(STATUS "CFD_USE_STABLE_ABI env: $ENV{CFD_USE_STABLE_ABI}")
+message(STATUS "CFD_ROOT env: $ENV{CFD_ROOT}")
 
 # Find Python and required components
 find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)

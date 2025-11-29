@@ -80,6 +80,8 @@ wheel.expand-macos-universal-tags = true
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 CFD_STATIC_LINK = "ON"
+# Note: CFD_USE_STABLE_ABI and CFD_ROOT are passed via environment variables
+# from cibuildwheel (CIBW_ENVIRONMENT) since they differ between local dev and CI
 
 [tool.scikit-build.metadata]
 [tool.scikit-build.metadata.version]
