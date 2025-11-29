@@ -58,26 +58,27 @@ jobs:
             fi
           fi
 
-      # Checkout the CFD C library into workspace subdirectory
+      # Checkout the CFD C library into 'src/cfd_lib' subdirectory
+      # This location is inside the source tree so it's accessible from cibuildwheel
+      # build environments (including Linux Docker containers where source is mounted)
       - name: Checkout CFD C library
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/cfd
-          path: cfd
+          path: src/cfd_lib
           ref: ${{ steps.cfd-version.outputs.ref }}
           fetch-depth: 0
 
       # Build wheels using cibuildwheel
-      # Configuration is in pyproject.toml - only override CFD_ROOT for CI
-      # (pyproject.toml uses ../cfd for local dev, CI uses ./cfd)
+      # The before-build commands in pyproject.toml will build the CFD library
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
           # CIBW_ENVIRONMENT completely replaces (not merges with) the environment
           # settings in pyproject.toml, including platform-specific ones.
           # We must specify all required variables here for CI builds.
-          # CFD_ROOT=./cfd points to the cfd checkout in CI workspace.
-          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./cfd"
+          # CFD_ROOT=./src/cfd_lib points to the cfd checkout inside source tree.
+          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
 
       - uses: actions/upload-artifact@v4
         with:
