@@ -216,12 +216,33 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
  */
 static PyObject* create_grid(PyObject* self, PyObject* args) {
     (void)self;
-    size_t nx, ny;
+    Py_ssize_t nx_signed, ny_signed;
     double xmin, xmax, ymin, ymax;
 
-    if (!PyArg_ParseTuple(args, "nndddd", &nx, &ny, &xmin, &xmax, &ymin, &ymax)) {
+    if (!PyArg_ParseTuple(args, "nndddd", &nx_signed, &ny_signed, &xmin, &xmax, &ymin, &ymax)) {
         return NULL;
     }
+
+    // Validate dimensions before calling C library
+    if (nx_signed < 2) {
+        PyErr_SetString(PyExc_ValueError, "nx must be at least 2");
+        return NULL;
+    }
+    if (ny_signed < 2) {
+        PyErr_SetString(PyExc_ValueError, "ny must be at least 2");
+        return NULL;
+    }
+    if (xmax <= xmin) {
+        PyErr_SetString(PyExc_ValueError, "xmax must be greater than xmin");
+        return NULL;
+    }
+    if (ymax <= ymin) {
+        PyErr_SetString(PyExc_ValueError, "ymax must be greater than ymin");
+        return NULL;
+    }
+
+    size_t nx = (size_t)nx_signed;
+    size_t ny = (size_t)ny_signed;
 
     Grid* grid = grid_create(nx, ny, xmin, xmax, ymin, ymax);
     if (grid == NULL) {

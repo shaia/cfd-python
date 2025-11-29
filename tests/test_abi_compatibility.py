@@ -349,8 +349,10 @@ class TestMemoryLeakPrevention:
                 ymin=0.0, ymax=1.0,
                 steps=3
             )
-            # Access nested dict
+            # Verify result structure to ensure it's properly formed
+            assert 'velocity_magnitude' in result
+            assert len(result['velocity_magnitude']) == 100
+            # Access nested dict if present
             if 'stats' in result:
-                stats = result['stats']
-                _ = stats.get('iterations', 0)
+                assert isinstance(result['stats'], dict)
             del result
