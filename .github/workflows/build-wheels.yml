@@ -140,6 +140,12 @@ jobs:
           echo ""
           echo "=== Python version ==="
           python --version
+          echo ""
+          echo "=== Wheel contents (looking for .so/.pyd files) ==="
+          for wheel in wheelhouse/*.whl; do
+            echo "--- $wheel ---"
+            python -m zipfile -l "$wheel" | grep -E '\.(so|pyd|dylib)$' || echo "No extension found in wheel!"
+          done
 
       - name: Install wheel and test dependencies
         run: |
@@ -151,10 +157,30 @@ jobs:
         shell: bash
         run: |
           echo "=== Installed package location ==="
-          python -c "import cfd_python; print(cfd_python.__file__)"
+          python -c "import cfd_python; print('Package __file__:', cfd_python.__file__)"
           echo ""
           echo "=== Package directory contents ==="
-          python -c "import cfd_python, os; print(os.listdir(os.path.dirname(cfd_python.__file__)))"
+          python -c "import cfd_python, os; pkgdir=os.path.dirname(cfd_python.__file__); print('Contents:', os.listdir(pkgdir)); exts=[f for f in os.listdir(pkgdir) if '.so' in f or '.pyd' in f]; print('Extensions found:', exts)"
+          echo ""
+          echo "=== Try importing C extension directly ==="
+          python -c "
+          import sys, os
+          import cfd_python
+          pkgdir = os.path.dirname(cfd_python.__file__)
+          print('Package dir:', pkgdir)
+          print('Has list_solvers:', hasattr(cfd_python, 'list_solvers'))
+          # Try direct import of the extension
+          try:
+              from cfd_python import cfd_python as ext
+              print('Direct extension import OK')
+              print('Extension has PyInit:', hasattr(ext, '__name__'))
+              print('list_solvers available:', hasattr(ext, 'list_solvers'))
+          except ImportError as e:
+              print('Direct extension import FAILED:', e)
+          # Check __all__
+          print('__all__:', getattr(cfd_python, '__all__', 'NOT DEFINED'))
+          print('__version__:', getattr(cfd_python, '__version__', 'NOT DEFINED'))
+          "
 
       - name: Run full test suite
         run: pytest tests/ -v
