@@ -32,32 +32,30 @@ jobs:
           fetch-depth: 0
 
       # Determine which version of CFD library to use
-      # Priority: workflow_dispatch input > release tag > push tag > master branch
+      # Priority: workflow_dispatch input > latest cfd release tag
+      # This ensures we always build against stable, tested cfd releases
       - name: Determine CFD library version
         id: cfd-version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Check for workflow_dispatch input first
           if [[ -n "${{ github.event.inputs.cfd_ref }}" ]]; then
             echo "ref=${{ github.event.inputs.cfd_ref }}" >> $GITHUB_OUTPUT
             echo "Using CFD library ref from input: ${{ github.event.inputs.cfd_ref }}"
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
-            # Use the release tag
-            echo "ref=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-            echo "Using CFD library tag: ${{ github.event.release.tag_name }}"
-          elif [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
-            # Push of a tag
-            TAG=${GITHUB_REF#refs/tags/}
-            echo "ref=$TAG" >> $GITHUB_OUTPUT
-            echo "Using CFD library tag: $TAG"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Manual trigger without input - use the current ref
-            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "Using CFD library ref matching current branch/tag: ${{ github.ref_name }}"
           else
-            # For PR/push to branch, use master (cfd repo's default branch)
-            echo "ref=master" >> $GITHUB_OUTPUT
-            echo "Using CFD library branch: master"
+            # Fetch the latest release tag from cfd repo
+            LATEST_TAG=$(gh api repos/${{ github.repository_owner }}/cfd/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
+
+            if [[ -n "$LATEST_TAG" ]]; then
+              echo "ref=$LATEST_TAG" >> $GITHUB_OUTPUT
+              echo "Using latest CFD release: $LATEST_TAG"
+            else
+              # Fallback to master if no releases exist
+              echo "ref=master" >> $GITHUB_OUTPUT
+              echo "No CFD releases found, falling back to master branch"
+            fi
           fi
 
       # Checkout the CFD C library into workspace subdirectory
