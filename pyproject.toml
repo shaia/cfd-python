@@ -125,9 +125,7 @@ environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_ST
 
 [tool.cibuildwheel.linux]
 # Linux-specific configuration
-before-all = [
-    "yum install -y cmake3 gcc-c++ || apt-get update && apt-get install -y cmake g++",
-]
+# manylinux images already have cmake and gcc installed
 # CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
 before-build = [
     "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
