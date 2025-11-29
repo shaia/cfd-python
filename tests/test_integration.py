@@ -4,8 +4,18 @@ Integration tests for complete workflows
 import pytest
 import cfd_python
 
+# Check if extension is available (not in dev mode)
+_EXTENSION_AVAILABLE = hasattr(cfd_python, 'list_solvers')
+
 # Get solver list at module load time for parametrization
-_AVAILABLE_SOLVERS = cfd_python.list_solvers()
+# Returns empty list if extension not built (dev mode)
+_AVAILABLE_SOLVERS = cfd_python.list_solvers() if _EXTENSION_AVAILABLE else []
+
+# Skip all tests in this module if extension not available
+pytestmark = pytest.mark.skipif(
+    not _EXTENSION_AVAILABLE,
+    reason="C extension not built (development mode)"
+)
 
 
 class TestIntegration:
