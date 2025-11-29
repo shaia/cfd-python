@@ -90,8 +90,9 @@ CFD_USE_STABLE_ABI = "ON"
 provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.cibuildwheel]
-# Build wheels for Python 3.12 on Linux only for now (simplified debugging)
-build = ["cp312-manylinux_x86_64"]
+# Build wheels for Python 3.8 on Linux only for now (simplified debugging)
+# Using cp38 since we're building abi3 wheels with wheel.py-api = "cp38"
+build = ["cp38-manylinux_x86_64"]
 skip = ["*-musllinux_*", "pp*"]  # Skip PyPy and musl Linux
 
 # Test command to verify wheels work

@@ -121,9 +121,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Test only on Linux with Python 3.12 for now (simplified debugging)
+        # Test on Linux with Python 3.8 (matches abi3 wheel) and 3.12 (to verify abi3 compat)
         os: [ubuntu-latest]
-        python-version: ["3.12"]
+        python-version: ["3.8", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
