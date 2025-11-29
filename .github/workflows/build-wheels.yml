@@ -59,12 +59,12 @@ jobs:
             echo "Using CFD library branch: main"
           fi
 
-      # Checkout the CFD C library (sibling repository)
+      # Checkout the CFD C library into workspace subdirectory
       - name: Checkout CFD C library
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/cfd
-          path: ../cfd
+          path: cfd
           ref: ${{ steps.cfd-version.outputs.ref }}
           fetch-depth: 0
 
@@ -72,14 +72,14 @@ jobs:
       - name: Build CFD C library (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          cd ../cfd
+          cd cfd
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build build --config Release
 
       - name: Build CFD C library (Windows)
         if: runner.os == 'Windows'
         run: |
-          cd ..\cfd
+          cd cfd
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build build --config Release
 
@@ -93,7 +93,8 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
 
           # Environment for static linking and stable ABI
-          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON"
+          # CFD_ROOT points to the cfd subdirectory in the workspace
+          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./cfd"
 
           # Test the built wheels
           CIBW_TEST_COMMAND: >
