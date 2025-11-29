@@ -79,6 +79,18 @@ jobs:
           # All other settings (build flags, before-build, etc.) come from pyproject.toml
           CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
 
+      - name: List wheel contents for debugging
+        shell: bash
+        run: |
+          echo "=== Wheels built ==="
+          ls -la wheelhouse/
+          echo ""
+          echo "=== Inspecting wheel contents ==="
+          for wheel in wheelhouse/*.whl; do
+            echo "--- $wheel ---"
+            python -m zipfile -l "$wheel" | grep -E '\.(so|pyd|dylib)$' || echo "No extension found!"
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
