@@ -115,11 +115,22 @@ set_target_properties(cfd_python PROPERTIES
 # Use stable ABI if requested and available
 if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
     target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
-endif()
 
-# Set proper extension name
-if(WIN32)
-    set_target_properties(cfd_python PROPERTIES SUFFIX ".pyd")
+    # Set the correct extension suffix for stable ABI
+    # This ensures the .so/.pyd file is named correctly for abi3 wheels
+    if(WIN32)
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.pyd")
+    else()
+        # Linux and macOS both use .abi3.so for stable ABI
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
+    endif()
+    message(STATUS "Using stable ABI extension suffix")
+else()
+    # Non-stable ABI: use platform default suffix
+    # Python_add_library with WITH_SOABI handles this, but Windows needs explicit .pyd
+    if(WIN32)
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".pyd")
+    endif()
 endif()
 
 # Include directories
