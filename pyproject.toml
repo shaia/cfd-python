@@ -127,8 +127,10 @@ repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest
 # CFD_ROOT environment variable specifies the CFD library location
 # -DCMAKE_POSITION_INDEPENDENT_CODE=ON is required for static lib linked into shared object
 before-build = [
+    "echo 'DEBUG: CFD_ROOT='$CFD_ROOT && echo 'DEBUG: pwd='$(pwd) && ls -la $CFD_ROOT || echo 'CFD_ROOT not found'",
     "cmake -S $CFD_ROOT -B $CFD_ROOT/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON",
     "cmake --build $CFD_ROOT/build --config Release",
+    "echo 'DEBUG: Library built:' && ls -la $CFD_ROOT/build/lib/ || echo 'No lib directory'",
 ]
 # auditwheel handles any remaining dynamic dependencies (system libs)
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
