@@ -8,15 +8,30 @@ This script helps set up the optimal distribution strategy for CFD Python.
 import os
 import sys
 import subprocess
+import shlex
 import shutil
 from pathlib import Path
 
-def run_command(cmd, cwd=None, check=True):
-    """Run a command and return the result"""
-    print(f"Running: {cmd}")
+def run_command(cmd, cwd=None, check=True, env=None):
+    """Run a command and return the result.
+
+    Args:
+        cmd: Command as a list of arguments (preferred) or a string.
+             If a string is passed, it will be parsed using shlex.split.
+        cwd: Working directory for the command.
+        check: If True, raise CalledProcessError on non-zero exit.
+        env: Environment variables for the subprocess.
+    """
+    # Convert string commands to argument lists for security (no shell=True)
+    if isinstance(cmd, str):
+        args = shlex.split(cmd)
+    else:
+        args = cmd
+
+    print(f"Running: {' '.join(args)}")
     try:
-        result = subprocess.run(cmd, shell=True, cwd=cwd, check=check,
-                              capture_output=True, text=True)
+        result = subprocess.run(args, cwd=cwd, check=check,
+                              capture_output=True, text=True, env=env)
         if result.stdout:
             print(result.stdout)
         return result
@@ -143,10 +158,13 @@ target_link_libraries(cfd_python PRIVATE
     cfd_library
 )
 
-# On Windows, Python extension modules should not link against Python libraries
-# The symbols are provided by the Python interpreter at runtime
+# On Windows, Python extension modules using stable ABI should not link against
+# version-specific Python libraries. The symbols are provided by the interpreter at runtime.
 if(WIN32)
-    target_link_options(cfd_python PRIVATE "/NODEFAULTLIB:python311.lib")
+    # Exclude version-specific Python libs (python38.lib, python39.lib, etc.)
+    foreach(PY_VER RANGE 8 15)
+        target_link_options(cfd_python PRIVATE "/NODEFAULTLIB:python3${PY_VER}.lib")
+    endforeach()
     target_link_options(cfd_python PRIVATE "/NODEFAULTLIB:python3.lib")
 endif()
 
@@ -158,6 +176,8 @@ install(TARGETS cfd_python DESTINATION cfd_python)
     cmake_file.write_text(cmake_content.strip())
     print("OK: Updated main CMakeLists.txt")
 
+    return True
+
 def build_wheels_locally():
     """Build wheels locally for testing"""
     print("Building wheels locally...")
@@ -167,13 +187,18 @@ def build_wheels_locally():
         import cibuildwheel
     except ImportError:
         print("Installing cibuildwheel...")
-        run_command("pip install cibuildwheel")
+        run_command(["pip", "install", "cibuildwheel"])
 
     # Build wheels
     env = os.environ.copy()
-    env['CIBW_BUILD'] = 'cp311-*'  # Build only for current Python version for testing
+    # Build only for current Python version for testing
+    env['CIBW_BUILD'] = f'cp{sys.version_info.major}{sys.version_info.minor}-*'
 
-    result = run_command("python -m cibuildwheel --output-dir wheelhouse", check=False)
+    result = run_command(
+        ["python", "-m", "cibuildwheel", "--output-dir", "wheelhouse"],
+        check=False,
+        env=env
+    )
 
     if result.returncode == 0:
         print("OK: Wheels built successfully in wheelhouse/")
@@ -208,7 +233,7 @@ def test_wheel_installation():
         shutil.rmtree(test_env)
 
     # Create virtual environment
-    run_command(f"python -m venv {test_env}")
+    run_command(["python", "-m", "venv", str(test_env)])
 
     # Install wheel in test environment
     if sys.platform == "win32":
@@ -216,10 +241,11 @@ def test_wheel_installation():
     else:
         python_exe = test_env / "bin" / "python"
 
-    run_command(f'"{python_exe}" -m pip install "{wheel_path}"')
+    run_command([str(python_exe), "-m", "pip", "install", str(wheel_path)])
 
-    # Test the installation
-    test_script = '''
+    # Test the installation by writing script to a temp file
+    # (avoids shell quoting issues with multi-line strings)
+    test_script = '''\
 import cfd_python
 print(f"CFD Python version: {cfd_python.__version__}")
 
@@ -239,7 +265,19 @@ print("OK: Solver params test passed")
 print("All tests passed!")
 '''
 
-    result = run_command(f'"{python_exe}" -c "{test_script}"', check=False)
+    # Write test script to a temporary file and execute it
+    test_script_path = test_env / "test_install.py"
+    test_script_path.write_text(test_script)
+
+    result = subprocess.run(
+        [str(python_exe), str(test_script_path)],
+        capture_output=True,
+        text=True
+    )
+    if result.stdout:
+        print(result.stdout)
+    if result.returncode != 0 and result.stderr:
+        print(f"stderr: {result.stderr}")
 
     # Cleanup
     shutil.rmtree(test_env)
@@ -263,12 +301,12 @@ index-servers =
 
 [pypi]
 username = __token__
-password = <your-pypi-token>
+password = REPLACE_WITH_YOUR_PYPI_TOKEN
 
 [testpypi]
 repository = https://test.pypi.org/legacy/
 username = __token__
-password = <your-test-pypi-token>
+password = REPLACE_WITH_YOUR_TEST_PYPI_TOKEN
 '''
 
     print("PyPI configuration template:")

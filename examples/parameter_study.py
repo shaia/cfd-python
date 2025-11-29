@@ -147,11 +147,19 @@ def main():
     for n, max_vel, avg_vel in grid_results:
         print(f"  {n:3d}x{n:<3d}: max={max_vel:.6f}")
 
+    print("\nTime Step Study:")
+    for dt, max_vel, status in timestep_results:
+        print(f"  dt={dt}: max={max_vel:.6f} [{status}]")
+
     print("\nBest performing solver:")
     valid_solvers = [(name, max_v) for name, max_v, _, status in solver_results if status == "OK"]
     if valid_solvers:
         best = max(valid_solvers, key=lambda x: x[1])
         print(f"  {best[0]} (max_vel={best[1]:.6f})")
+
+    print("\nDomain Size Study:")
+    for xsize, ysize, max_vel in domain_results:
+        print(f"  [{xsize}x{ysize}]: max={max_vel:.6f}")
 
     print("\nStudy completed!")
 

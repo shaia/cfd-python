@@ -63,12 +63,12 @@ def main():
     print("2. Simulation with VTK Output")
     print("-" * 50)
 
-    vel_mag = cfd_python.run_simulation(
+    vel_mag_vtk = cfd_python.run_simulation(
         nx=nx, ny=ny,
         steps=steps,
         output_file="basic_output.vtk"
     )
-    print("   Output: basic_output.vtk")
+    print(f"   Output: basic_output.vtk ({len(vel_mag_vtk)} points)")
 
     # Method 3: Using run_simulation_with_params
     print("\n" + "-" * 50)

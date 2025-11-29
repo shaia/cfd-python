@@ -102,10 +102,13 @@ def clean():
         print(f"Removing {pycache}")
         shutil.rmtree(pycache)
 
-    # Remove .pyd/.so files
+    # Remove .pyd/.so files (skip virtual environments)
+    # Common venv directory names to exclude
+    venv_patterns = {".venv", "venv", ".env", "env", "virtualenv", ".virtualenv"}
     for ext in ["*.pyd", "*.so"]:
         for f in PROJECT_ROOT.rglob(ext):
-            if ".venv" not in str(f):
+            # Check if any path component matches a venv pattern
+            if not any(part in venv_patterns for part in f.parts):
                 print(f"Removing {f}")
                 f.unlink()
 

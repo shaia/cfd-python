@@ -77,5 +77,6 @@ class TestDynamicSolverConstants:
 
     def test_explicit_euler_constant(self):
         """Test SOLVER_EXPLICIT_EULER constant specifically"""
-        assert hasattr(cfd_python, 'SOLVER_EXPLICIT_EULER')
-        assert cfd_python.SOLVER_EXPLICIT_EULER == 'explicit_euler'
+        assert hasattr(cfd_python, 'SOLVER_EXPLICIT_EULER'), \
+            "SOLVER_EXPLICIT_EULER constant should be defined"
+        assert getattr(cfd_python, 'SOLVER_EXPLICIT_EULER') == 'explicit_euler'

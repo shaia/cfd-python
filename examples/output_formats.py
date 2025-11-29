@@ -122,12 +122,19 @@ def main():
     print("-" * 50)
 
     print("   Available output types:")
-    print(f"   - OUTPUT_PRESSURE = {cfd_python.OUTPUT_PRESSURE}")
-    print(f"   - OUTPUT_VELOCITY = {cfd_python.OUTPUT_VELOCITY}")
-    print(f"   - OUTPUT_FULL_FIELD = {cfd_python.OUTPUT_FULL_FIELD}")
-    print(f"   - OUTPUT_CSV_TIMESERIES = {cfd_python.OUTPUT_CSV_TIMESERIES}")
-    print(f"   - OUTPUT_CSV_CENTERLINE = {cfd_python.OUTPUT_CSV_CENTERLINE}")
-    print(f"   - OUTPUT_CSV_STATISTICS = {cfd_python.OUTPUT_CSV_STATISTICS}")
+    output_constants = [
+        'OUTPUT_PRESSURE',
+        'OUTPUT_VELOCITY',
+        'OUTPUT_FULL_FIELD',
+        'OUTPUT_CSV_TIMESERIES',
+        'OUTPUT_CSV_CENTERLINE',
+        'OUTPUT_CSV_STATISTICS',
+    ]
+    for const_name in output_constants:
+        if hasattr(cfd_python, const_name):
+            print(f"   - {const_name} = {getattr(cfd_python, const_name)}")
+        else:
+            print(f"   - {const_name} = (not defined)")
 
     # Summary
     print("\n6. Output Files Summary")
