@@ -76,11 +76,8 @@ jobs:
         uses: pypa/cibuildwheel@v2.21.3
         env:
           # Override CFD_ROOT to point to the cfd subdirectory in CI workspace
-          # All other settings come from pyproject.toml [tool.cibuildwheel]
-          CIBW_ENVIRONMENT_PASS_LINUX: CFD_ROOT
-          CIBW_ENVIRONMENT_PASS_MACOS: CFD_ROOT
-          CIBW_ENVIRONMENT_PASS_WINDOWS: CFD_ROOT
-          CFD_ROOT: ./cfd
+          # CIBW_ENVIRONMENT overrides pyproject.toml environment settings
+          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./cfd"
 
       - uses: actions/upload-artifact@v4
         with:
