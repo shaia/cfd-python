@@ -132,11 +132,29 @@ jobs:
           name: wheels-${{ matrix.os }}
           path: wheelhouse
 
+      - name: List available wheels
+        shell: bash
+        run: |
+          echo "=== Available wheels ==="
+          ls -la wheelhouse/
+          echo ""
+          echo "=== Python version ==="
+          python --version
+
       - name: Install wheel and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --find-links wheelhouse cfd-python
+          python -m pip install -v --find-links wheelhouse cfd-python
           python -m pip install pytest numpy
+
+      - name: Verify installation
+        shell: bash
+        run: |
+          echo "=== Installed package location ==="
+          python -c "import cfd_python; print(cfd_python.__file__)"
+          echo ""
+          echo "=== Package directory contents ==="
+          python -c "import cfd_python, os; print(os.listdir(os.path.dirname(cfd_python.__file__)))"
 
       - name: Run full test suite
         run: pytest tests/ -v
