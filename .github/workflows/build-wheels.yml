@@ -70,26 +70,14 @@ jobs:
           fetch-depth: 0
 
       # Build wheels using cibuildwheel
-      # We override both environment and before-build for each platform since
-      # pyproject.toml has platform-specific settings that use ../cfd (for local dev)
+      # Configuration is in pyproject.toml - we only override CFD_ROOT for CI
+      # (pyproject.toml defaults to ../cfd for local dev, CI uses ./src/cfd_lib)
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
-          # Override environment for all platforms - CFD_ROOT points to checkout inside source tree
+          # Override CFD_ROOT to point to the cfd checkout inside the source tree
+          # All other settings (build flags, before-build, etc.) come from pyproject.toml
           CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
-          CIBW_ENVIRONMENT_LINUX: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
-          CIBW_ENVIRONMENT_MACOS: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
-          CIBW_ENVIRONMENT_WINDOWS: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
-          # Override before-build to use the correct CFD_ROOT path
-          CIBW_BEFORE_BUILD_LINUX: >
-            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON &&
-            cmake --build ./src/cfd_lib/build --config Release
-          CIBW_BEFORE_BUILD_MACOS: >
-            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF &&
-            cmake --build ./src/cfd_lib/build --config Release
-          CIBW_BEFORE_BUILD_WINDOWS: >
-            cmake -S ./src/cfd_lib -B ./src/cfd_lib/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF &&
-            cmake --build ./src/cfd_lib/build --config Release
 
       - uses: actions/upload-artifact@v4
         with:
