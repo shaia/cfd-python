@@ -78,6 +78,8 @@ jobs:
           # Override CFD_ROOT to point to the cfd checkout inside the source tree
           # All other settings (build flags, before-build, etc.) come from pyproject.toml
           CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON CFD_ROOT=./src/cfd_lib"
+          # Enable verbose output to see CMake and compiler commands
+          CIBW_BUILD_VERBOSITY: "3"
 
       - name: List wheel contents for debugging
         shell: bash
