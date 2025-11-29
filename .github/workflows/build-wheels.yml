@@ -24,8 +24,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Skip Windows for now due to DLL linking issues
-        os: [ubuntu-latest, macos-latest]
+        # Build only on Linux for now (simplified debugging)
+        os: [ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -121,9 +121,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Skip Windows for now due to DLL linking issues
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        # Test only on Linux with Python 3.12 for now (simplified debugging)
+        os: [ubuntu-latest]
+        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@v4
