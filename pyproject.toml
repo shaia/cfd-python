@@ -114,10 +114,10 @@ environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_ST
 
 [tool.cibuildwheel.macos]
 # macOS-specific configuration
-# CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
+# CFD_ROOT environment variable specifies the CFD library location
 before-build = [
-    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
+    "echo Building CFD library at CFD_ROOT=$CFD_ROOT && cd $CFD_ROOT && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd $CFD_ROOT && cmake --build build --config Release",
 ]
 # delocate handles any remaining dynamic dependencies (system libs)
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
@@ -126,10 +126,10 @@ environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_ST
 [tool.cibuildwheel.linux]
 # Linux-specific configuration
 # manylinux images already have cmake and gcc installed
-# CFD_ROOT environment variable specifies the CFD library location (default: ../cfd)
+# CFD_ROOT environment variable specifies the CFD library location
 before-build = [
-    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
+    "echo Building CFD library at CFD_ROOT=$CFD_ROOT && cd $CFD_ROOT && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
+    "cd $CFD_ROOT && cmake --build build --config Release",
 ]
 # auditwheel handles any remaining dynamic dependencies (system libs)
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
