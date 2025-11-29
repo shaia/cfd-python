@@ -30,11 +30,19 @@ else()
 endif()
 set(CFD_INCLUDE_DIR "${CFD_ROOT_DIR}/lib/include")
 
-# Determine library directory based on build type
+# Determine library search paths
+# Multi-config generators (Visual Studio, Xcode) put libs in build/lib/<Config>/
+# Single-config generators (Make, Ninja) put libs directly in build/lib/
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CFD_LIBRARY_DIR "${CFD_ROOT_DIR}/build/lib/Debug")
+    set(CFD_LIBRARY_DIRS
+        "${CFD_ROOT_DIR}/build/lib/Debug"  # Multi-config (Windows/VS)
+        "${CFD_ROOT_DIR}/build/lib"         # Single-config (Linux/macOS Make)
+    )
 else()
-    set(CFD_LIBRARY_DIR "${CFD_ROOT_DIR}/build/lib/Release")
+    set(CFD_LIBRARY_DIRS
+        "${CFD_ROOT_DIR}/build/lib/Release" # Multi-config (Windows/VS)
+        "${CFD_ROOT_DIR}/build/lib"          # Single-config (Linux/macOS Make)
+    )
 endif()
 
 # Check if CFD library exists (prefer static library for packaging)
@@ -43,13 +51,13 @@ if(CFD_STATIC_LINK)
     if(WIN32)
         find_library(CFD_LIBRARY
             NAMES cfd_library_static cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
+            PATHS ${CFD_LIBRARY_DIRS}
             NO_DEFAULT_PATH
         )
     else()
         find_library(CFD_LIBRARY
-            NAMES libcfd_library.a cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
+            NAMES cfd_library
+            PATHS ${CFD_LIBRARY_DIRS}
             NO_DEFAULT_PATH
         )
     endif()
@@ -57,13 +65,13 @@ else()
     # Look for shared library
     find_library(CFD_LIBRARY
         NAMES cfd_library
-        PATHS ${CFD_LIBRARY_DIR}
+        PATHS ${CFD_LIBRARY_DIRS}
         NO_DEFAULT_PATH
     )
 endif()
 
 if(NOT CFD_LIBRARY)
-    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIR}. Please build the C library first.")
+    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIRS}. Please build the C library first.")
 endif()
 
 message(STATUS "Found CFD library: ${CFD_LIBRARY}")
