@@ -92,8 +92,8 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 arm64
           CIBW_ARCHS_LINUX: x86_64
 
-          # Environment for static linking
-          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON"
+          # Environment for static linking and stable ABI
+          CIBW_ENVIRONMENT: "CMAKE_BUILD_TYPE=Release CFD_STATIC_LINK=ON CFD_USE_STABLE_ABI=ON"
 
           # Test the built wheels
           CIBW_TEST_COMMAND: >
@@ -178,7 +178,11 @@ jobs:
     name: Upload to PyPI
     needs: [build_wheels, build_sdist, test_package]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    # Publish on: release event, tag push (v*), or workflow_dispatch on a tag
+    if: |
+      github.event_name == 'release' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v'))
     environment:
       name: pypi
       url: https://pypi.org/p/cfd-python
