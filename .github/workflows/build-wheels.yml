@@ -45,13 +45,19 @@ jobs:
           echo "=== CFD library built ==="
           ls -la cfd/build/lib/
 
+      - name: Setup MinGW (Windows)
+        if: runner.os == 'Windows'
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
       - name: Build CFD library (Windows)
         if: runner.os == 'Windows'
         run: |
-          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          cmake -S cfd -B cfd/build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build cfd/build --config Release
           echo "=== CFD library built ==="
-          dir cfd\build\lib\Release
+          dir cfd\build\lib
 
       - name: Build wheel (Unix)
         if: runner.os != 'Windows'
@@ -74,7 +80,9 @@ jobs:
         run: |
           echo "CFD_ROOT=$env:CFD_ROOT"
           echo "Checking CFD library location..."
-          dir "$env:CFD_ROOT\build\lib\Release"
+          dir "$env:CFD_ROOT\build\lib"
+          # Set CMAKE_GENERATOR for scikit-build-core to use MinGW
+          $env:CMAKE_GENERATOR = "MinGW Makefiles"
           pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           dir dist
