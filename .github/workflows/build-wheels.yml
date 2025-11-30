@@ -48,7 +48,7 @@ jobs:
       - name: Build CFD library (Windows)
         if: runner.os == 'Windows'
         run: |
-          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
           cmake --build cfd/build --config Release
           echo "=== CFD library built ==="
           dir cfd\build\lib\Release

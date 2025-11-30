@@ -59,6 +59,15 @@ set_target_properties(cfd_python PROPERTIES
     C_STANDARD 11
 )
 
+# On Windows, use static MSVC runtime to create self-contained extension
+# This must match how the CFD library was built
+if(MSVC)
+    cmake_policy(SET CMP0091 NEW)
+    set_property(TARGET cfd_python PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    message(STATUS "Using static MSVC runtime (MultiThreaded)")
+endif()
+
 # Configure stable ABI if enabled
 if(CFD_USE_STABLE_ABI)
     # Define Py_LIMITED_API for Python 3.8+ stable ABI
