@@ -68,6 +68,34 @@ if(CFD_USE_STABLE_ABI)
     if(WIN32)
         # Windows uses .pyd for all Python extensions
         set_target_properties(cfd_python PROPERTIES SUFFIX ".pyd")
+
+        # On Windows, we need to link against python3.lib for stable ABI
+        # Find the Python library directory and link against python3.lib
+        get_filename_component(PYTHON_LIB_DIR "${Python_LIBRARY_DIRS}" DIRECTORY)
+        if(NOT PYTHON_LIB_DIR)
+            # Fallback: derive from Python executable path
+            get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
+            set(PYTHON_LIB_DIR "${PYTHON_DIR}/libs")
+        endif()
+        find_library(PYTHON3_STABLE_LIB
+            NAMES python3
+            PATHS "${PYTHON_LIB_DIR}" "${Python_LIBRARY_DIRS}"
+            NO_DEFAULT_PATH
+        )
+        if(PYTHON3_STABLE_LIB)
+            target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
+            message(STATUS "Linking against stable ABI library: ${PYTHON3_STABLE_LIB}")
+        else()
+            # Manual fallback - construct the path
+            get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
+            set(PYTHON3_STABLE_LIB "${PYTHON_DIR}/libs/python3.lib")
+            if(EXISTS "${PYTHON3_STABLE_LIB}")
+                target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
+                message(STATUS "Linking against stable ABI library (fallback): ${PYTHON3_STABLE_LIB}")
+            else()
+                message(WARNING "Could not find python3.lib for stable ABI linking")
+            endif()
+        endif()
     else()
         # Linux/macOS use .abi3.so for stable ABI
         set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
