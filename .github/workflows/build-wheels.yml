@@ -44,11 +44,14 @@ jobs:
 
       - name: Build wheel
         env:
-          CFD_ROOT: ./cfd
+          CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
-          CFD_USE_STABLE_ABI: "OFF"
         run: |
-          python -m build --wheel
+          echo "CFD_ROOT=$CFD_ROOT"
+          echo "Checking CFD library location..."
+          ls -la $CFD_ROOT/build/lib/ || echo "Library dir not found"
+          # Use pip wheel to build, which respects env vars better
+          pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           ls -la dist/
 
@@ -70,8 +73,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Set up Python 3.8
         uses: actions/setup-python@v5
         with:
@@ -90,6 +91,8 @@ jobs:
 
       - name: Test import
         run: |
+          # Run from temp dir to avoid importing from source
+          cd /tmp
           python -c "
           import cfd_python
           print('Package loaded:', cfd_python.__file__)
@@ -99,5 +102,14 @@ jobs:
               print('Solvers:', cfd_python.list_solvers())
           "
 
+      # Checkout only tests directory for running tests
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tests
+          sparse-checkout-cone-mode: false
+
       - name: Run tests
-        run: pytest tests/ -v
+        run: |
+          # Run from a different directory to use installed package
+          cd /tmp
+          pytest $GITHUB_WORKSPACE/tests/ -v
