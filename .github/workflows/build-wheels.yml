@@ -132,14 +132,20 @@ jobs:
       - name: Debug Windows DLL (Windows)
         if: runner.os == 'Windows'
         run: |
-          $pkg_dir = python -c "import os, cfd_python; print(os.path.dirname(cfd_python.__file__))"
+          # Find package directory via pip
+          $pkg_dir = python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])"
+          $pkg_dir = "$pkg_dir\cfd_python"
           echo "Package directory: $pkg_dir"
           dir $pkg_dir
           # Check what the .pyd file depends on
           $pyd_file = Get-ChildItem "$pkg_dir\*.pyd" | Select-Object -First 1
           echo "PYD file: $pyd_file"
-          # Use dumpbin to show dependencies
-          & "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\dumpbin.exe" /dependents $pyd_file.FullName
+          if ($pyd_file) {
+            # Use dumpbin to show dependencies
+            $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+            echo "Using dumpbin: $dumpbin"
+            & $dumpbin.FullName /dependents $pyd_file.FullName
+          }
 
       - name: Test import (Unix)
         if: runner.os != 'Windows'

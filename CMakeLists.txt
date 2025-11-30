@@ -51,57 +51,64 @@ message(STATUS "Found CFD library: ${CFD_LIBRARY}")
 message(STATUS "CFD include dir: ${CFD_INCLUDE_DIR}")
 
 # Create the Python extension module
-Python_add_library(cfd_python MODULE WITH_SOABI
-    src/cfd_python.c
-)
+# For stable ABI on Windows, we need to manually create the library
+# to avoid Python_add_library linking against version-specific python3X.lib
+if(CFD_USE_STABLE_ABI AND WIN32)
+    # Create module manually for Windows stable ABI
+    add_library(cfd_python MODULE src/cfd_python.c)
 
-set_target_properties(cfd_python PROPERTIES
-    C_STANDARD 11
-)
+    set_target_properties(cfd_python PROPERTIES
+        C_STANDARD 11
+        PREFIX ""
+        SUFFIX ".pyd"
+    )
 
-# Configure stable ABI if enabled
-if(CFD_USE_STABLE_ABI)
-    # Define Py_LIMITED_API for Python 3.8+ stable ABI
+    # Define Py_LIMITED_API for stable ABI
     target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
 
-    # Set the correct extension suffix for abi3
-    if(WIN32)
-        # Windows uses .pyd for all Python extensions
-        set_target_properties(cfd_python PROPERTIES SUFFIX ".pyd")
-
-        # On Windows, we need to link against python3.lib for stable ABI
-        # Find the Python library directory and link against python3.lib
-        get_filename_component(PYTHON_LIB_DIR "${Python_LIBRARY_DIRS}" DIRECTORY)
-        if(NOT PYTHON_LIB_DIR)
-            # Fallback: derive from Python executable path
-            get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
-            set(PYTHON_LIB_DIR "${PYTHON_DIR}/libs")
-        endif()
-        find_library(PYTHON3_STABLE_LIB
-            NAMES python3
-            PATHS "${PYTHON_LIB_DIR}" "${Python_LIBRARY_DIRS}"
-            NO_DEFAULT_PATH
-        )
-        if(PYTHON3_STABLE_LIB)
-            target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
-            message(STATUS "Linking against stable ABI library: ${PYTHON3_STABLE_LIB}")
-        else()
-            # Manual fallback - construct the path
-            get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
+    # Find and link python3.lib (stable ABI library)
+    get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
+    # Try multiple possible locations for python3.lib
+    find_library(PYTHON3_STABLE_LIB
+        NAMES python3
+        PATHS
+            "${PYTHON_DIR}/libs"
+            "${PYTHON_DIR}/../libs"
+            "${Python_LIBRARY_DIRS}"
+        NO_DEFAULT_PATH
+    )
+    if(NOT PYTHON3_STABLE_LIB)
+        # Last resort: construct path directly
+        if(EXISTS "${PYTHON_DIR}/libs/python3.lib")
             set(PYTHON3_STABLE_LIB "${PYTHON_DIR}/libs/python3.lib")
-            if(EXISTS "${PYTHON3_STABLE_LIB}")
-                target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
-                message(STATUS "Linking against stable ABI library (fallback): ${PYTHON3_STABLE_LIB}")
-            else()
-                message(WARNING "Could not find python3.lib for stable ABI linking")
-            endif()
+        elseif(EXISTS "${PYTHON_DIR}/../libs/python3.lib")
+            set(PYTHON3_STABLE_LIB "${PYTHON_DIR}/../libs/python3.lib")
         endif()
-    else()
-        # Linux/macOS use .abi3.so for stable ABI
-        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
     endif()
 
-    message(STATUS "Building with stable ABI (abi3) for Python 3.8+")
+    if(PYTHON3_STABLE_LIB)
+        target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
+        message(STATUS "Linking against stable ABI library: ${PYTHON3_STABLE_LIB}")
+    else()
+        message(FATAL_ERROR "Could not find python3.lib for stable ABI linking")
+    endif()
+
+    message(STATUS "Building Windows stable ABI extension")
+else()
+    # Use Python_add_library for Unix or non-stable-ABI builds
+    Python_add_library(cfd_python MODULE WITH_SOABI
+        src/cfd_python.c
+    )
+
+    set_target_properties(cfd_python PROPERTIES
+        C_STANDARD 11
+    )
+
+    if(CFD_USE_STABLE_ABI)
+        target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
+        message(STATUS "Building Unix stable ABI extension")
+    endif()
 endif()
 
 target_include_directories(cfd_python PRIVATE
