@@ -9,8 +9,11 @@ on:
 
 jobs:
   build_wheel:
-    name: Build wheel on Linux
-    runs-on: ubuntu-latest
+    name: Build wheel on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -64,13 +67,16 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel
+          name: wheel-${{ matrix.os }}
           path: dist/*.whl
 
   test_wheel:
-    name: Test wheel
+    name: Test wheel on ${{ matrix.os }}
     needs: [build_wheel]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - name: Set up Python 3.8
@@ -80,7 +86,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: wheel
+          name: wheel-${{ matrix.os }}
           path: dist
 
       - name: Install wheel
