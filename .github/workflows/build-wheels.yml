@@ -1,0 +1,185 @@
+name: Build and Test Wheels
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build_wheel:
+    name: Build wheel on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Checkout CFD C library
+      - name: Checkout CFD C library
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/cfd
+          path: cfd
+          fetch-depth: 0
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build scikit-build-core setuptools-scm
+
+      - name: Build CFD library (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build cfd/build --config Release
+          echo "=== CFD library built ==="
+          ls -la cfd/build/lib/
+
+      - name: Build CFD library (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build cfd/build --config Release
+          echo "=== CFD library built ==="
+          dir cfd\build\lib\Release
+
+      - name: Build wheel (Unix)
+        if: runner.os != 'Windows'
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+        run: |
+          echo "CFD_ROOT=$CFD_ROOT"
+          echo "Checking CFD library location..."
+          ls -la $CFD_ROOT/build/lib/ || echo "Library dir not found"
+          pip wheel . --no-deps --wheel-dir dist/
+          echo "=== Wheel built ==="
+          ls -la dist/
+
+      - name: Build wheel (Windows)
+        if: runner.os == 'Windows'
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+        run: |
+          echo "CFD_ROOT=$env:CFD_ROOT"
+          echo "Checking CFD library location..."
+          dir "$env:CFD_ROOT\build\lib\Release"
+          pip wheel . --no-deps --wheel-dir dist/
+          echo "=== Wheel built ==="
+          dir dist
+
+      - name: Inspect wheel contents
+        run: |
+          python -c "
+          import glob, zipfile
+          for wheel in glob.glob('dist/*.whl'):
+              print(f'=== Contents of {wheel} ===')
+              with zipfile.ZipFile(wheel) as zf:
+                  for name in zf.namelist():
+                      print(name)
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}
+          path: dist/*.whl
+
+  test_wheel:
+    name: Test wheel on ${{ matrix.os }} with Python ${{ matrix.python }}
+    needs: [build_wheel]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.8", "3.12"]
+
+    steps:
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python }}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}
+          path: dist
+
+      - name: Install wheel (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
+          pip install pytest numpy
+
+      - name: Install wheel (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install (Get-ChildItem dist/*.whl).FullName
+          pip install pytest numpy
+
+      - name: Debug Windows DLL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Find package directory via pip
+          $pkg_dir = python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])"
+          $pkg_dir = "$pkg_dir\cfd_python"
+          echo "Package directory: $pkg_dir"
+          dir $pkg_dir
+          # Check what the .pyd file depends on
+          $pyd_file = Get-ChildItem "$pkg_dir\*.pyd" | Select-Object -First 1
+          echo "PYD file: $pyd_file"
+          if ($pyd_file) {
+            # Use dumpbin to show dependencies
+            $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+            echo "Using dumpbin: $dumpbin"
+            & $dumpbin.FullName /dependents $pyd_file.FullName
+          }
+
+      - name: Test import (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd /tmp
+          python -c "
+          import cfd_python
+          print('Package loaded:', cfd_python.__file__)
+          print('Version:', cfd_python.__version__)
+          print('Has list_solvers:', hasattr(cfd_python, 'list_solvers'))
+          if hasattr(cfd_python, 'list_solvers'):
+              print('Solvers:', cfd_python.list_solvers())
+          "
+
+      - name: Test import (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd $env:TEMP
+          python -c "import cfd_python; print('Package loaded:', cfd_python.__file__); print('Version:', cfd_python.__version__); print('Has list_solvers:', hasattr(cfd_python, 'list_solvers')); print('Solvers:', cfd_python.list_solvers()) if hasattr(cfd_python, 'list_solvers') else None"
+
+      # Checkout only tests directory for running tests
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tests
+          sparse-checkout-cone-mode: false
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd /tmp
+          pytest $GITHUB_WORKSPACE/tests/ -v
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd $env:TEMP
+          pytest "$env:GITHUB_WORKSPACE\tests" -v

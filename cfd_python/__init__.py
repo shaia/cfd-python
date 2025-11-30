@@ -97,8 +97,27 @@ try:
     # Build complete __all__ list
     __all__ = _CORE_EXPORTS + _solver_constants
 
-except ImportError:
-    # Development mode - module not yet built
-    __all__ = _CORE_EXPORTS
-    if __version__ is None:
-        __version__ = "0.0.0-dev"
+except ImportError as e:
+    # Check if this is a development environment (source checkout without built extension)
+    # vs a broken installation (extension exists but fails to load)
+    import os as _os
+    _package_dir = _os.path.dirname(__file__)
+
+    # Look for compiled extension files
+    _extension_exists = any(
+        f.startswith('cfd_python') and (f.endswith('.pyd') or f.endswith('.so'))
+        for f in _os.listdir(_package_dir)
+    )
+
+    if _extension_exists:
+        # Extension file exists but failed to load - this is an error
+        raise ImportError(
+            f"Failed to load cfd_python C extension: {e}\n"
+            "The extension file exists but could not be imported. "
+            "This may indicate a missing dependency or ABI incompatibility."
+        ) from e
+    else:
+        # Development mode - module not yet built
+        __all__ = _CORE_EXPORTS
+        if __version__ is None:
+            __version__ = "0.0.0-dev"

@@ -1,137 +1,124 @@
 cmake_minimum_required(VERSION 3.15...3.27)
 
-project(cfd_python LANGUAGES C CXX)
+project(cfd_python LANGUAGES C)
 
 # Option to control static vs dynamic linking
-option(CFD_STATIC_LINK "Statically link the CFD library" ON)
-
-# Option to disable stable ABI (useful for development with Windows Store Python)
-option(CFD_USE_STABLE_ABI "Use Python stable ABI (abi3)" OFF)
-
-# Find Python and required components
-find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
-
-# Enable stable ABI (abi3) for Python 3.8+ if requested
-if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
-    set(CMAKE_C_VISIBILITY_PRESET hidden)
-    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-    add_definitions(-DPy_LIMITED_API=0x03080000)
-    message(STATUS "Using Python stable ABI (abi3)")
+if(DEFINED ENV{CFD_STATIC_LINK})
+    set(CFD_STATIC_LINK_DEFAULT $ENV{CFD_STATIC_LINK})
+else()
+    set(CFD_STATIC_LINK_DEFAULT ON)
 endif()
+option(CFD_STATIC_LINK "Statically link the CFD library" ${CFD_STATIC_LINK_DEFAULT})
 
-# Find the CFD library from the parent project
-# Check for CFD_ROOT environment variable, fall back to default location
+# Option to use stable ABI (abi3)
+option(CFD_USE_STABLE_ABI "Build with Python stable ABI for cross-version compatibility" ON)
+
+# Debug output
+message(STATUS "CFD_STATIC_LINK: ${CFD_STATIC_LINK}")
+message(STATUS "CFD_USE_STABLE_ABI: ${CFD_USE_STABLE_ABI}")
+message(STATUS "CFD_ROOT env: $ENV{CFD_ROOT}")
+
+# Find Python
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
+message(STATUS "Python version: ${Python_VERSION}")
+message(STATUS "Python executable: ${Python_EXECUTABLE}")
+
+# Find CFD library
 if(DEFINED ENV{CFD_ROOT})
     set(CFD_ROOT_DIR "$ENV{CFD_ROOT}")
-    message(STATUS "Using CFD_ROOT from environment: ${CFD_ROOT_DIR}")
 else()
     set(CFD_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../cfd")
-    message(STATUS "Using default CFD_ROOT: ${CFD_ROOT_DIR}")
 endif()
+message(STATUS "CFD_ROOT_DIR: ${CFD_ROOT_DIR}")
+
 set(CFD_INCLUDE_DIR "${CFD_ROOT_DIR}/lib/include")
+set(CFD_LIBRARY_DIRS
+    "${CFD_ROOT_DIR}/build/lib/Release"
+    "${CFD_ROOT_DIR}/build/lib"
+)
 
-# Determine library directory based on build type
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CFD_LIBRARY_DIR "${CFD_ROOT_DIR}/build/lib/Debug")
-else()
-    set(CFD_LIBRARY_DIR "${CFD_ROOT_DIR}/build/lib/Release")
-endif()
-
-# Check if CFD library exists (prefer static library for packaging)
-if(CFD_STATIC_LINK)
-    # Look for static library first
-    if(WIN32)
-        find_library(CFD_LIBRARY
-            NAMES cfd_library_static cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
-            NO_DEFAULT_PATH
-        )
-    else()
-        find_library(CFD_LIBRARY
-            NAMES libcfd_library.a cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
-            NO_DEFAULT_PATH
-        )
-    endif()
-else()
-    # Look for shared library
-    find_library(CFD_LIBRARY
-        NAMES cfd_library
-        PATHS ${CFD_LIBRARY_DIR}
-        NO_DEFAULT_PATH
-    )
-endif()
+find_library(CFD_LIBRARY
+    NAMES cfd_library cfd_library_static
+    PATHS ${CFD_LIBRARY_DIRS}
+    NO_DEFAULT_PATH
+)
 
 if(NOT CFD_LIBRARY)
-    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIR}. Please build the C library first.")
+    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIRS}")
 endif()
 
 message(STATUS "Found CFD library: ${CFD_LIBRARY}")
-message(STATUS "CFD include directory: ${CFD_INCLUDE_DIR}")
-message(STATUS "Static linking: ${CFD_STATIC_LINK}")
+message(STATUS "CFD include dir: ${CFD_INCLUDE_DIR}")
 
 # Create the Python extension module
-# Use WITH_SOABI to get proper ABI suffix for stable ABI builds
-Python_add_library(cfd_python MODULE WITH_SOABI
-    src/cfd_python.c
-)
+# For stable ABI on Windows, we need to manually create the library
+# to avoid Python_add_library linking against version-specific python3X.lib
+if(CFD_USE_STABLE_ABI AND WIN32)
+    # Create module manually for Windows stable ABI
+    add_library(cfd_python MODULE src/cfd_python.c)
 
-# Set properties for stable ABI
-set_target_properties(cfd_python PROPERTIES
-    C_STANDARD 11
-    CXX_STANDARD 17
-    INTERPROCEDURAL_OPTIMIZATION ON
-)
+    set_target_properties(cfd_python PROPERTIES
+        C_STANDARD 11
+        PREFIX ""
+        SUFFIX ".pyd"
+    )
 
-# Use stable ABI if requested and available
-if(CFD_USE_STABLE_ABI AND Python_VERSION VERSION_GREATER_EQUAL "3.8")
+    # Define Py_LIMITED_API for stable ABI
     target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
+
+    # Find and link python3.lib (stable ABI library)
+    get_filename_component(PYTHON_DIR "${Python_EXECUTABLE}" DIRECTORY)
+    # Try multiple possible locations for python3.lib
+    find_library(PYTHON3_STABLE_LIB
+        NAMES python3
+        PATHS
+            "${PYTHON_DIR}/libs"
+            "${PYTHON_DIR}/../libs"
+            "${Python_LIBRARY_DIRS}"
+        NO_DEFAULT_PATH
+    )
+    if(NOT PYTHON3_STABLE_LIB)
+        # Last resort: construct path directly
+        if(EXISTS "${PYTHON_DIR}/libs/python3.lib")
+            set(PYTHON3_STABLE_LIB "${PYTHON_DIR}/libs/python3.lib")
+        elseif(EXISTS "${PYTHON_DIR}/../libs/python3.lib")
+            set(PYTHON3_STABLE_LIB "${PYTHON_DIR}/../libs/python3.lib")
+        endif()
+    endif()
+
+    if(PYTHON3_STABLE_LIB)
+        target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
+        message(STATUS "Linking against stable ABI library: ${PYTHON3_STABLE_LIB}")
+    else()
+        message(FATAL_ERROR "Could not find python3.lib for stable ABI linking")
+    endif()
+
+    message(STATUS "Building Windows stable ABI extension")
+else()
+    # Use Python_add_library for Unix or non-stable-ABI builds
+    Python_add_library(cfd_python MODULE WITH_SOABI
+        src/cfd_python.c
+    )
+
+    set_target_properties(cfd_python PROPERTIES
+        C_STANDARD 11
+    )
+
+    if(CFD_USE_STABLE_ABI)
+        target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
+        message(STATUS "Building Unix stable ABI extension")
+    endif()
 endif()
 
-# Set proper extension name
-if(WIN32)
-    set_target_properties(cfd_python PROPERTIES SUFFIX ".pyd")
-endif()
-
-# Include directories
 target_include_directories(cfd_python PRIVATE
     ${CFD_INCLUDE_DIR}
     ${Python_INCLUDE_DIRS}
 )
 
-# Link libraries
 target_link_libraries(cfd_python PRIVATE
     ${CFD_LIBRARY}
 )
 
-# On Windows, handle stable ABI linking explicitly
-if(WIN32)
-    if(CFD_USE_STABLE_ABI)
-        # For stable ABI, we need to link against python3.lib
-        # Find the Python library directory and link python3.lib explicitly
-        get_filename_component(Python_LIBRARY_DIR "${Python_LIBRARY_DIRS}" ABSOLUTE)
-        if(NOT Python_LIBRARY_DIR)
-            # Fallback: derive from Python executable path
-            get_filename_component(Python_ROOT "${Python_EXECUTABLE}" DIRECTORY)
-            set(Python_LIBRARY_DIR "${Python_ROOT}/libs")
-        endif()
-        find_library(Python3_LIBRARY
-            NAMES python3
-            PATHS "${Python_LIBRARY_DIR}"
-            NO_DEFAULT_PATH
-        )
-        if(Python3_LIBRARY)
-            message(STATUS "Using stable ABI library: ${Python3_LIBRARY}")
-            target_link_libraries(cfd_python PRIVATE ${Python3_LIBRARY})
-        else()
-            message(WARNING "python3.lib not found, falling back to versioned library")
-            target_link_libraries(cfd_python PRIVATE Python::Module)
-        endif()
-    else()
-        # For non-stable ABI, use the versioned library
-        target_link_libraries(cfd_python PRIVATE Python::Module)
-    endif()
-endif()
-
-# Install the extension module in the cfd_python package directory
+# Install the extension module
 install(TARGETS cfd_python DESTINATION cfd_python)
