@@ -45,19 +45,13 @@ jobs:
           echo "=== CFD library built ==="
           ls -la cfd/build/lib/
 
-      - name: Setup MinGW (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install mingw -y --no-progress
-          echo "C:\ProgramData\mingw64\mingw64\bin" >> $env:GITHUB_PATH
-
       - name: Build CFD library (Windows)
         if: runner.os == 'Windows'
         run: |
-          cmake -S cfd -B cfd/build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-static" -DCMAKE_EXE_LINKER_FLAGS="-static"
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build cfd/build --config Release
           echo "=== CFD library built ==="
-          dir cfd\build\lib
+          dir cfd\build\lib\Release
 
       - name: Build wheel (Unix)
         if: runner.os != 'Windows'
@@ -80,9 +74,7 @@ jobs:
         run: |
           echo "CFD_ROOT=$env:CFD_ROOT"
           echo "Checking CFD library location..."
-          dir "$env:CFD_ROOT\build\lib"
-          # Set CMAKE_GENERATOR for scikit-build-core to use MinGW
-          $env:CMAKE_GENERATOR = "MinGW Makefiles"
+          dir "$env:CFD_ROOT\build\lib\Release"
           pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           dir dist
@@ -136,6 +128,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install (Get-ChildItem dist/*.whl).FullName
           pip install pytest numpy
+
+      - name: Debug Windows DLL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $pkg_dir = python -c "import os, cfd_python; print(os.path.dirname(cfd_python.__file__))"
+          echo "Package directory: $pkg_dir"
+          dir $pkg_dir
+          # Check what the .pyd file depends on
+          $pyd_file = Get-ChildItem "$pkg_dir\*.pyd" | Select-Object -First 1
+          echo "PYD file: $pyd_file"
+          # Use dumpbin to show dependencies
+          & "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\dumpbin.exe" /dependents $pyd_file.FullName
 
       - name: Test import (Unix)
         if: runner.os != 'Windows'
