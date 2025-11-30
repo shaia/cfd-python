@@ -54,7 +54,7 @@ jobs:
       - name: Build CFD library (Windows)
         if: runner.os == 'Windows'
         run: |
-          cmake -S cfd -B cfd/build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake -S cfd -B cfd/build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-static" -DCMAKE_EXE_LINKER_FLAGS="-static"
           cmake --build cfd/build --config Release
           echo "=== CFD library built ==="
           dir cfd\build\lib

@@ -59,6 +59,12 @@ set_target_properties(cfd_python PROPERTIES
     C_STANDARD 11
 )
 
+# On Windows with MinGW, statically link the runtime to avoid DLL dependencies
+if(WIN32 AND MINGW)
+    target_link_options(cfd_python PRIVATE -static-libgcc -static)
+    message(STATUS "Using static MinGW runtime linking")
+endif()
+
 # Configure stable ABI if enabled
 if(CFD_USE_STABLE_ABI)
     # Define Py_LIMITED_API for Python 3.8+ stable ABI
