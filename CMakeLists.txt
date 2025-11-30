@@ -59,6 +59,12 @@ set_target_properties(cfd_python PROPERTIES
     C_STANDARD 11
 )
 
+# On Windows, use static MSVC runtime to avoid requiring VC++ redistributable
+if(MSVC)
+    set_property(TARGET cfd_python PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # Configure stable ABI if enabled
 if(CFD_USE_STABLE_ABI)
     # Define Py_LIMITED_API for Python 3.8+ stable ABI
