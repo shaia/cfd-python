@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -38,14 +38,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install build scikit-build-core setuptools-scm
 
-      - name: Build CFD library
+      - name: Build CFD library (Unix)
+        if: runner.os != 'Windows'
         run: |
           cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build cfd/build --config Release
           echo "=== CFD library built ==="
           ls -la cfd/build/lib/
 
-      - name: Build wheel
+      - name: Build CFD library (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build cfd/build --config Release
+          echo "=== CFD library built ==="
+          dir cfd\build\lib\Release
+
+      - name: Build wheel (Unix)
+        if: runner.os != 'Windows'
         env:
           CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
@@ -53,17 +63,33 @@ jobs:
           echo "CFD_ROOT=$CFD_ROOT"
           echo "Checking CFD library location..."
           ls -la $CFD_ROOT/build/lib/ || echo "Library dir not found"
-          # Use pip wheel to build, which respects env vars better
           pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           ls -la dist/
 
+      - name: Build wheel (Windows)
+        if: runner.os == 'Windows'
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+        run: |
+          echo "CFD_ROOT=$env:CFD_ROOT"
+          echo "Checking CFD library location..."
+          dir "$env:CFD_ROOT\build\lib\Release"
+          pip wheel . --no-deps --wheel-dir dist/
+          echo "=== Wheel built ==="
+          dir dist
+
       - name: Inspect wheel contents
         run: |
-          for wheel in dist/*.whl; do
-            echo "=== Contents of $wheel ==="
-            python -m zipfile -l "$wheel"
-          done
+          python -c "
+          import glob, zipfile
+          for wheel in glob.glob('dist/*.whl'):
+              print(f'=== Contents of {wheel} ===')
+              with zipfile.ZipFile(wheel) as zf:
+                  for name in zf.namelist():
+                      print(name)
+          "
 
       - uses: actions/upload-artifact@v4
         with:
@@ -76,7 +102,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.8", "3.12"]
 
     steps:
@@ -90,15 +116,23 @@ jobs:
           name: wheel-${{ matrix.os }}
           path: dist
 
-      - name: Install wheel
+      - name: Install wheel (Unix)
+        if: runner.os != 'Windows'
         run: |
           python -m pip install --upgrade pip
           pip install dist/*.whl
           pip install pytest numpy
 
-      - name: Test import
+      - name: Install wheel (Windows)
+        if: runner.os == 'Windows'
         run: |
-          # Run from temp dir to avoid importing from source
+          python -m pip install --upgrade pip
+          pip install (Get-ChildItem dist/*.whl).FullName
+          pip install pytest numpy
+
+      - name: Test import (Unix)
+        if: runner.os != 'Windows'
+        run: |
           cd /tmp
           python -c "
           import cfd_python
@@ -109,14 +143,26 @@ jobs:
               print('Solvers:', cfd_python.list_solvers())
           "
 
+      - name: Test import (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd $env:TEMP
+          python -c "import cfd_python; print('Package loaded:', cfd_python.__file__); print('Version:', cfd_python.__version__); print('Has list_solvers:', hasattr(cfd_python, 'list_solvers')); print('Solvers:', cfd_python.list_solvers()) if hasattr(cfd_python, 'list_solvers') else None"
+
       # Checkout only tests directory for running tests
       - uses: actions/checkout@v4
         with:
           sparse-checkout: tests
           sparse-checkout-cone-mode: false
 
-      - name: Run tests
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
         run: |
-          # Run from a different directory to use installed package
           cd /tmp
           pytest $GITHUB_WORKSPACE/tests/ -v
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd $env:TEMP
+          pytest "$env:GITHUB_WORKSPACE\tests" -v
