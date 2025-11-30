@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   build_wheel:
@@ -19,7 +20,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Checkout CFD C library
       - name: Checkout CFD C library
         uses: actions/checkout@v4
         with:
@@ -58,10 +58,8 @@ jobs:
         env:
           CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
+          CFD_USE_STABLE_ABI: "ON"
         run: |
-          echo "CFD_ROOT=$CFD_ROOT"
-          echo "Checking CFD library location..."
-          ls -la $CFD_ROOT/build/lib/ || echo "Library dir not found"
           pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           ls -la dist/
@@ -71,10 +69,8 @@ jobs:
         env:
           CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
+          CFD_USE_STABLE_ABI: "ON"
         run: |
-          echo "CFD_ROOT=$env:CFD_ROOT"
-          echo "Checking CFD library location..."
-          dir "$env:CFD_ROOT\build\lib\Release"
           pip wheel . --no-deps --wheel-dir dist/
           echo "=== Wheel built ==="
           dir dist
@@ -129,24 +125,6 @@ jobs:
           pip install (Get-ChildItem dist/*.whl).FullName
           pip install pytest numpy
 
-      - name: Debug Windows DLL (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Find package directory via pip
-          $pkg_dir = python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])"
-          $pkg_dir = "$pkg_dir\cfd_python"
-          echo "Package directory: $pkg_dir"
-          dir $pkg_dir
-          # Check what the .pyd file depends on
-          $pyd_file = Get-ChildItem "$pkg_dir\*.pyd" | Select-Object -First 1
-          echo "PYD file: $pyd_file"
-          if ($pyd_file) {
-            # Use dumpbin to show dependencies
-            $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
-            echo "Using dumpbin: $dumpbin"
-            & $dumpbin.FullName /dependents $pyd_file.FullName
-          }
-
       - name: Test import (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -166,7 +144,6 @@ jobs:
           cd $env:TEMP
           python -c "import cfd_python; print('Package loaded:', cfd_python.__file__); print('Version:', cfd_python.__version__); print('Has list_solvers:', hasattr(cfd_python, 'list_solvers')); print('Solvers:', cfd_python.list_solvers()) if hasattr(cfd_python, 'list_solvers') else None"
 
-      # Checkout only tests directory for running tests
       - uses: actions/checkout@v4
         with:
           sparse-checkout: tests
