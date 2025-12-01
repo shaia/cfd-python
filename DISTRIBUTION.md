@@ -45,7 +45,7 @@ The build system uses `CFD_STATIC_LINK` to control linking and `CFD_USE_STABLE_A
 
 ```cmake
 option(CFD_STATIC_LINK "Statically link the CFD library" ON)
-option(CFD_USE_STABLE_ABI "Use Python stable ABI for cross-version compatibility" OFF)
+option(CFD_USE_STABLE_ABI "Use Python stable ABI for cross-version compatibility" ON)
 
 # Static library discovery with platform-specific names
 if(CFD_STATIC_LINK)
@@ -188,7 +188,13 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/cfd
           path: cfd
-      - name: Build CFD library
+      - name: Build CFD library (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build cfd/build --config Release
+      - name: Build CFD library (Windows)
+        if: runner.os == 'Windows'
         run: |
           cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build cfd/build --config Release
@@ -254,23 +260,60 @@ jobs:
     permissions:
       id-token: write  # Required for trusted publishing
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
       - name: Validate artifacts
         run: |
-          # Ensure at least 3 wheels (linux, macos, windows) and 1 sdist
-      - uses: pypa/gh-action-pypi-publish@release/v1
+          ls -la dist/
+          WHEELS=$(ls dist/*.whl 2>/dev/null | wc -l)
+          SDIST=$(ls dist/*.tar.gz 2>/dev/null | wc -l)
+          echo "Found $WHEELS wheel(s) and $SDIST sdist(s)"
+          if [ "$WHEELS" -lt 3 ]; then
+            echo "ERROR: Expected at least 3 wheels (linux, macos, windows)"
+            exit 1
+          fi
+      # Pin to SHA to prevent supply-chain attacks (id-token: write is sensitive)
+      - uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc  # v1.12.4
         with:
           repository-url: https://test.pypi.org/legacy/
 
   publish_pypi:
     needs: [build, build_sdist]
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - name: Validate artifacts
+        run: |
+          ls -la dist/
+          WHEELS=$(ls dist/*.whl 2>/dev/null | wc -l)
+          SDIST=$(ls dist/*.tar.gz 2>/dev/null | wc -l)
+          if [ "$WHEELS" -lt 3 ] || [ "$SDIST" -lt 1 ]; then
+            echo "ERROR: Missing artifacts"; exit 1
+          fi
+      # Pin to SHA to prevent supply-chain attacks (id-token: write is sensitive)
+      - uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc  # v1.12.4
 ```
 
 ### Trusted Publishing Setup
