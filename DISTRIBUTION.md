@@ -41,45 +41,54 @@ cfd-workspace/
 
 ### CMakeLists.txt
 
-The build system uses `CFD_STATIC_LINK` to control linking with platform-specific library names:
+The build system uses `CFD_STATIC_LINK` to control linking and `CFD_USE_STABLE_ABI` for Python version compatibility:
 
 ```cmake
 option(CFD_STATIC_LINK "Statically link the CFD library" ON)
+option(CFD_USE_STABLE_ABI "Use Python stable ABI for cross-version compatibility" OFF)
 
+# Static library discovery with platform-specific names
 if(CFD_STATIC_LINK)
     if(WIN32)
-        # Windows: look for cfd_library_static.lib or cfd_library.lib
-        find_library(CFD_LIBRARY
-            NAMES cfd_library_static cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
-            NO_DEFAULT_PATH
-        )
+        find_library(CFD_LIBRARY NAMES cfd_library_static cfd_library ...)
     else()
-        # Unix: look for libcfd_library.a
-        find_library(CFD_LIBRARY
-            NAMES libcfd_library.a cfd_library
-            PATHS ${CFD_LIBRARY_DIR}
-            NO_DEFAULT_PATH
-        )
+        find_library(CFD_LIBRARY NAMES libcfd_library.a cfd_library ...)
+    endif()
+endif()
+
+# Stable ABI support for single-wheel-per-platform builds
+if(CFD_USE_STABLE_ABI AND WIN32)
+    # Windows: manually link against python3.lib (stable ABI)
+    add_library(cfd_python MODULE src/cfd_python.c)
+    target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
+    target_link_libraries(cfd_python PRIVATE ${PYTHON3_STABLE_LIB})
+else()
+    # Unix: use Python_add_library with .abi3.so suffix
+    Python_add_library(cfd_python MODULE WITH_SOABI src/cfd_python.c)
+    if(CFD_USE_STABLE_ABI)
+        target_compile_definitions(cfd_python PRIVATE Py_LIMITED_API=0x03080000)
+        set_target_properties(cfd_python PROPERTIES SUFFIX ".abi3.so")
     endif()
 endif()
 ```
 
 ### pyproject.toml
 
-Static linking is enabled in the build configuration:
+Static linking and stable ABI are enabled in the build configuration:
 
 ```toml
+[tool.scikit-build]
+minimum-version = "0.4"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp38"  # Target Python 3.8+ stable ABI
+
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 CFD_STATIC_LINK = "ON"
-
-[tool.cibuildwheel]
-# Global environment - static linking for self-contained wheels
-# CFD_ROOT can be set to override the default ../cfd location
-# CFD_USE_STABLE_ABI is enabled for wheel builds to support multiple Python versions
-environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
+CFD_USE_STABLE_ABI = "ON"
 ```
+
+The `wheel.py-api = "cp38"` setting combined with `CFD_USE_STABLE_ABI` produces a single wheel per platform that works with Python 3.8+.
 
 ---
 
@@ -123,90 +132,157 @@ cd ../cfd-python
 pip install -e .
 ```
 
-### Build Wheels with cibuildwheel
+### CI Build Process
 
-```bash
-pip install cibuildwheel
-python -m cibuildwheel --output-dir wheelhouse
-```
+The GitHub Actions workflow builds wheels directly using `pip wheel` with the CFD library checked out as a sibling directory. This approach:
 
-This creates wheels for Python 3.8-3.12 on all platforms.
+- Produces one wheel per platform (stable ABI)
+- Works with Python 3.8-3.12+
+- Statically links the CFD C library
 
-### Platform-Specific Build Steps
+**Build steps (all platforms):**
 
-The `pyproject.toml` configures platform-specific build steps. The `CFD_ROOT` environment variable specifies the C library location (defaults to `../cfd`):
+1. Checkout cfd-python repository
+2. Checkout cfd C library to `./cfd` directory
+3. Build CFD library with CMake (static, release)
+4. Build wheel with `pip wheel . --no-deps`
 
-**Windows:**
-```toml
-[tool.cibuildwheel.windows]
-before-build = [
-    "cd %CFD_ROOT% && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd %CFD_ROOT% && cmake --build build --config Release",
-]
-environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
-```
+**Environment variables:**
 
-**macOS:**
-```toml
-[tool.cibuildwheel.macos]
-before-build = [
-    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
-]
-repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
-environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
-```
-
-**Linux:**
-```toml
-[tool.cibuildwheel.linux]
-before-all = [
-    "yum install -y cmake3 gcc-c++ || apt-get update && apt-get install -y cmake g++",
-]
-before-build = [
-    "cd ${CFD_ROOT:-../cfd} && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF",
-    "cd ${CFD_ROOT:-../cfd} && cmake --build build --config Release",
-]
-repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
-environment = { CMAKE_BUILD_TYPE = "Release", CFD_STATIC_LINK = "ON", CFD_USE_STABLE_ABI = "ON", CFD_ROOT = "../cfd" }
-```
+- `CFD_ROOT`: Path to CFD C library (set to `./cfd` in CI)
+- `CFD_STATIC_LINK=ON`: Enable static linking
+- `CFD_USE_STABLE_ABI=ON`: Build for Python stable ABI
 
 ---
 
 ## CI/CD Pipeline
 
-### GitHub Actions Workflow
+### GitHub Actions Workflows
+
+The project uses two workflows:
+
+#### build-wheels.yml (Reusable)
+
+Builds and tests wheels on all platforms. Triggered on push, PR, or called by other workflows.
 
 ```yaml
-name: Build and Test
+name: Build and Test Wheels
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:  # Allows publish.yml to reuse this workflow
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
+  build_wheel:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout CFD C library
+        uses: actions/checkout@v4
         with:
-          submodules: true
-      - uses: pypa/cibuildwheel@v2.16.2
-      - uses: actions/upload-artifact@v3
+          repository: ${{ github.repository_owner }}/cfd
+          path: cfd
+      - name: Build CFD library
+        run: |
+          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build cfd/build --config Release
+      - name: Build wheel
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+          CFD_USE_STABLE_ABI: "ON"
+        run: pip wheel . --no-deps --wheel-dir dist/
+      - uses: actions/upload-artifact@v4
         with:
-          path: ./wheelhouse/*.whl
+          name: wheel-${{ matrix.os }}
+          path: dist/*.whl
 
-  upload_pypi:
-    needs: [build_wheels]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+  test_wheel:
+    needs: [build_wheel]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.8", "3.12"]
     steps:
-      - uses: actions/download-artifact@v3
-      - uses: pypa/gh-action-pypi-publish@v1.8.10
+      # Install wheel, run import test, run pytest
 ```
+
+#### publish.yml (PyPI Publishing)
+
+Publishes to TestPyPI or PyPI using trusted publishing (OIDC).
+
+```yaml
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [testpypi, pypi]
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-wheels.yml  # Reuse build workflow
+
+  build_sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m build --sdist
+      - uses: actions/upload-artifact@v4
+
+  publish_testpypi:
+    needs: [build, build_sdist]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi'
+    environment: testpypi
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Validate artifacts
+        run: |
+          # Ensure at least 3 wheels (linux, macos, windows) and 1 sdist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish_pypi:
+    needs: [build, build_sdist]
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - uses: pypa/gh-action-pypi-publish@release/v1
+```
+
+### Trusted Publishing Setup
+
+The workflows use PyPI trusted publishing (OIDC) instead of API tokens:
+
+1. Go to PyPI/TestPyPI → Your Project → Settings → Publishing
+2. Add a new trusted publisher with:
+   - Owner: `<your-github-org>`
+   - Repository: `cfd-python`
+   - Workflow: `publish.yml`
+   - Environment: `pypi` or `testpypi`
 
 ---
 
