@@ -5,7 +5,7 @@ Python bindings for high-performance CFD simulation library using CPython C-API 
 ## Features
 
 - **High Performance**: Direct bindings to optimized C library
-- **Stable ABI**: Compatible across Python 3.8+ versions
+- **Stable ABI**: Compatible across Python 3.9+ versions
 - **Static Linking**: Self-contained wheels with no external dependencies
 - **Dynamic Solver Discovery**: New solvers automatically available
 - **Multiple Output Formats**: VTK and CSV export support
@@ -241,7 +241,7 @@ cfd_python.OUTPUT_CSV_STATISTICS  # Global statistics (CSV)
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 For building from source:
