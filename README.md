@@ -12,7 +12,30 @@ Python bindings for high-performance CFD simulation library using CPython C-API 
 
 ## Installation
 
-### From PyPI (Recommended)
+### Installing uv (optional but recommended)
+
+[uv](https://docs.astral.sh/uv/) is a fast Python package manager. Install it with:
+
+```bash
+# On macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# On Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip
+pip install uv
+```
+
+### From PyPI
+
+Using uv (recommended):
+
+```bash
+uv pip install cfd-python
+```
+
+Or with pip:
 
 ```bash
 pip install cfd-python
@@ -37,7 +60,13 @@ The Python package requires the C CFD library to be built first. By default, it 
    pip install .
    ```
 
-   Or with a custom library location:
+   Or with [uv](https://docs.astral.sh/uv/) for faster installs:
+
+   ```bash
+   uv pip install .
+   ```
+
+   With a custom library location:
 
    ```bash
    CFD_ROOT=/path/to/cfd pip install .
@@ -45,8 +74,25 @@ The Python package requires the C CFD library to be built first. By default, it 
 
 ### For Development
 
+We use [uv](https://docs.astral.sh/uv/) for fast dependency management:
+
 ```bash
-pip install -e .
+# Create virtual environment
+uv venv
+
+# Activate it
+source .venv/bin/activate      # Linux/macOS
+source .venv/Scripts/activate  # Windows (Git Bash)
+.venv\Scripts\activate         # Windows (cmd)
+
+# Install with dev dependencies
+uv pip install -e ".[test,dev]"
+```
+
+Alternatively, using pip:
+
+```bash
+pip install -e ".[test,dev]"
 ```
 
 ## Quick Start
@@ -196,6 +242,7 @@ cfd_python.OUTPUT_CSV_STATISTICS  # Global statistics (CSV)
 ## Requirements
 
 - Python 3.8+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 For building from source:
 
