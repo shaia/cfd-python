@@ -1,7 +1,9 @@
 """
 Tests for error handling
 """
+
 import pytest
+
 import cfd_python
 
 
@@ -28,8 +30,7 @@ class TestErrorHandling:
         output_file = tmp_path / "invalid.vtk"
         with pytest.raises(TypeError):
             cfd_python.write_vtk_scalar(
-                str(output_file), "test", "not a list",
-                5, 5, 0.0, 1.0, 0.0, 1.0
+                str(output_file), "test", "not a list", 5, 5, 0.0, 1.0, 0.0, 1.0
             )
 
     def test_has_solver_invalid_type(self):
@@ -40,7 +41,7 @@ class TestErrorHandling:
     def test_get_solver_info_empty_string(self):
         """Test error handling for empty solver name"""
         with pytest.raises(ValueError):
-            cfd_python.get_solver_info('')
+            cfd_python.get_solver_info("")
 
     def test_create_grid_zero_dimensions(self):
         """Test error handling for zero grid dimensions."""

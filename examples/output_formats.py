@@ -7,13 +7,15 @@ Demonstrates how to export simulation results to various formats:
 - CSV files for data analysis
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sys
 
-import cfd_python
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import tempfile
 from pathlib import Path
+
+import cfd_python
 
 
 def main():
@@ -51,11 +53,7 @@ def main():
 
     vtk_scalar_file = output_dir / "pressure_field.vtk"
     cfd_python.write_vtk_scalar(
-        str(vtk_scalar_file),
-        "pressure",
-        p_data,
-        nx, ny,
-        xmin, xmax, ymin, ymax
+        str(vtk_scalar_file), "pressure", p_data, nx, ny, xmin, xmax, ymin, ymax
     )
     print(f"   Written: {vtk_scalar_file.name}")
     print(f"   Size: {vtk_scalar_file.stat().st_size} bytes")
@@ -63,11 +61,7 @@ def main():
     # VTK with velocity magnitude
     vtk_velmag_file = output_dir / "velocity_magnitude.vtk"
     cfd_python.write_vtk_scalar(
-        str(vtk_velmag_file),
-        "velocity_magnitude",
-        result,
-        nx, ny,
-        xmin, xmax, ymin, ymax
+        str(vtk_velmag_file), "velocity_magnitude", result, nx, ny, xmin, xmax, ymin, ymax
     )
     print(f"   Written: {vtk_velmag_file.name}")
 
@@ -77,11 +71,7 @@ def main():
 
     vtk_vector_file = output_dir / "velocity_field.vtk"
     cfd_python.write_vtk_vector(
-        str(vtk_vector_file),
-        "velocity",
-        u_data, v_data,
-        nx, ny,
-        xmin, xmax, ymin, ymax
+        str(vtk_vector_file), "velocity", u_data, v_data, nx, ny, xmin, xmax, ymin, ymax
     )
     print(f"   Written: {vtk_vector_file.name}")
     print(f"   Size: {vtk_vector_file.stat().st_size} bytes")
@@ -95,11 +85,16 @@ def main():
     # Write initial state (create new file)
     cfd_python.write_csv_timeseries(
         str(csv_file),
-        step=0, time=0.0,
-        u_data=u_data, v_data=v_data, p_data=p_data,
-        nx=nx, ny=ny,
-        dt=0.001, iterations=0,
-        create_new=True
+        step=0,
+        time=0.0,
+        u_data=u_data,
+        v_data=v_data,
+        p_data=p_data,
+        nx=nx,
+        ny=ny,
+        dt=0.001,
+        iterations=0,
+        create_new=True,
     )
     print(f"   Created: {csv_file.name}")
 
@@ -108,13 +103,18 @@ def main():
         time = step * 0.001
         cfd_python.write_csv_timeseries(
             str(csv_file),
-            step=step, time=time,
-            u_data=u_data, v_data=v_data, p_data=p_data,
-            nx=nx, ny=ny,
-            dt=0.001, iterations=step * 5,
-            create_new=False
+            step=step,
+            time=time,
+            u_data=u_data,
+            v_data=v_data,
+            p_data=p_data,
+            nx=nx,
+            ny=ny,
+            dt=0.001,
+            iterations=step * 5,
+            create_new=False,
         )
-    print(f"   Appended 5 timesteps")
+    print("   Appended 5 timesteps")
     print(f"   Final size: {csv_file.stat().st_size} bytes")
 
     # Output Type Constants
@@ -123,12 +123,12 @@ def main():
 
     print("   Available output types:")
     output_constants = [
-        'OUTPUT_PRESSURE',
-        'OUTPUT_VELOCITY',
-        'OUTPUT_FULL_FIELD',
-        'OUTPUT_CSV_TIMESERIES',
-        'OUTPUT_CSV_CENTERLINE',
-        'OUTPUT_CSV_STATISTICS',
+        "OUTPUT_PRESSURE",
+        "OUTPUT_VELOCITY",
+        "OUTPUT_FULL_FIELD",
+        "OUTPUT_CSV_TIMESERIES",
+        "OUTPUT_CSV_CENTERLINE",
+        "OUTPUT_CSV_STATISTICS",
     ]
     for const_name in output_constants:
         if hasattr(cfd_python, const_name):
@@ -146,8 +146,8 @@ def main():
 
     print("\n" + "=" * 50)
     print("Output formats example completed!")
-    print(f"\nVTK files can be opened with ParaView or VisIt.")
-    print(f"CSV files can be opened with Excel, Python pandas, etc.")
+    print("\nVTK files can be opened with ParaView or VisIt.")
+    print("CSV files can be opened with Excel, Python pandas, etc.")
 
 
 if __name__ == "__main__":

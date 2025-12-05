@@ -5,10 +5,9 @@ These tests verify the behavior when:
 1. Extension exists but fails to load (broken installation)
 2. No extension exists (development mode)
 """
-import os
+
 import sys
-import tempfile
-import shutil
+
 import pytest
 
 
@@ -24,7 +23,7 @@ class TestImportErrorHandling:
 
         # Create __init__.py with the same logic as the real one
         # but importing from fake_cfd_broken submodule
-        init_content = '''
+        init_content = """
 import os as _os
 
 _CORE_EXPORTS = ["run_simulation", "list_solvers"]
@@ -48,7 +47,7 @@ except ImportError as e:
         __all__ = _CORE_EXPORTS
         if __version__ is None:
             __version__ = "0.0.0-dev"
-'''
+"""
         (fake_package / "__init__.py").write_text(init_content)
 
         # Create a fake broken extension file
@@ -61,7 +60,7 @@ except ImportError as e:
         sys.path.insert(0, str(tmp_path))
         try:
             with pytest.raises(ImportError) as exc_info:
-                import fake_cfd_broken
+                pass
 
             # Verify the error message is helpful
             assert "Failed to load C extension" in str(exc_info.value)
@@ -79,7 +78,7 @@ except ImportError as e:
         fake_package.mkdir()
 
         # Create __init__.py with the same logic
-        init_content = '''
+        init_content = """
 import os as _os
 
 _CORE_EXPORTS = ["run_simulation", "list_solvers"]
@@ -105,7 +104,7 @@ except ImportError as e:
         __all__ = _CORE_EXPORTS
         if __version__ is None:
             __version__ = "0.0.0-dev"
-'''
+"""
         (fake_package / "__init__.py").write_text(init_content)
 
         # Add to path and import
@@ -128,11 +127,11 @@ except ImportError as e:
         import cfd_python
 
         # Should have version
-        assert hasattr(cfd_python, '__version__')
+        assert hasattr(cfd_python, "__version__")
         assert cfd_python.__version__ is not None
 
         # Should have core functions
-        assert hasattr(cfd_python, 'list_solvers')
+        assert hasattr(cfd_python, "list_solvers")
         assert callable(cfd_python.list_solvers)
 
         # list_solvers should return a non-empty list
@@ -148,7 +147,7 @@ except ImportError as e:
         # Test with no extension files
         files = list(test_dir.iterdir())
         has_extension = any(
-            f.name.startswith('cfd_python') and (f.name.endswith('.pyd') or f.name.endswith('.so'))
+            f.name.startswith("cfd_python") and (f.name.endswith(".pyd") or f.name.endswith(".so"))
             for f in files
         )
         assert not has_extension
@@ -157,7 +156,7 @@ except ImportError as e:
         (test_dir / "cfd_python.cp311-win_amd64.pyd").touch()
         files = list(test_dir.iterdir())
         has_extension = any(
-            f.name.startswith('cfd_python') and (f.name.endswith('.pyd') or f.name.endswith('.so'))
+            f.name.startswith("cfd_python") and (f.name.endswith(".pyd") or f.name.endswith(".so"))
             for f in files
         )
         assert has_extension
@@ -167,7 +166,7 @@ except ImportError as e:
         (test_dir / "cfd_python.cpython-311-x86_64-linux-gnu.so").touch()
         files = list(test_dir.iterdir())
         has_extension = any(
-            f.name.startswith('cfd_python') and (f.name.endswith('.pyd') or f.name.endswith('.so'))
+            f.name.startswith("cfd_python") and (f.name.endswith(".pyd") or f.name.endswith(".so"))
             for f in files
         )
         assert has_extension
@@ -177,7 +176,7 @@ except ImportError as e:
         (test_dir / "other_module.so").touch()
         files = list(test_dir.iterdir())
         has_extension = any(
-            f.name.startswith('cfd_python') and (f.name.endswith('.pyd') or f.name.endswith('.so'))
+            f.name.startswith("cfd_python") and (f.name.endswith(".pyd") or f.name.endswith(".so"))
             for f in files
         )
         assert not has_extension

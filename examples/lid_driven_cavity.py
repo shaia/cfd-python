@@ -11,33 +11,36 @@ This example demonstrates:
 - Comparing solver performance
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sys
 
-import cfd_python
-import numpy as np
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import tempfile
 from pathlib import Path
+
+import numpy as np
+
+import cfd_python
 
 
 def run_cavity_simulation(nx, ny, steps, solver_type=None, output_dir=None):
     """Run a lid-driven cavity simulation."""
     kwargs = {
-        'nx': nx,
-        'ny': ny,
-        'steps': steps,
-        'xmin': 0.0,
-        'xmax': 1.0,
-        'ymin': 0.0,
-        'ymax': 1.0,
+        "nx": nx,
+        "ny": ny,
+        "steps": steps,
+        "xmin": 0.0,
+        "xmax": 1.0,
+        "ymin": 0.0,
+        "ymax": 1.0,
     }
 
     if solver_type:
-        kwargs['solver_type'] = solver_type
+        kwargs["solver_type"] = solver_type
 
     if output_dir:
-        kwargs['output_file'] = str(output_dir / f"cavity_{nx}x{ny}_{steps}steps.vtk")
+        kwargs["output_file"] = str(output_dir / f"cavity_{nx}x{ny}_{steps}steps.vtk")
 
     result = cfd_python.run_simulation(**kwargs)
     return np.array(result).reshape((ny, nx))
@@ -46,22 +49,22 @@ def run_cavity_simulation(nx, ny, steps, solver_type=None, output_dir=None):
 def analyze_results(vel_mag, nx, ny):
     """Analyze the velocity field."""
     # Find vortex center (location of minimum velocity in central region)
-    center_region = vel_mag[ny//4:3*ny//4, nx//4:3*nx//4]
+    center_region = vel_mag[ny // 4 : 3 * ny // 4, nx // 4 : 3 * nx // 4]
     min_idx = np.unravel_index(np.argmin(center_region), center_region.shape)
 
     # Adjust indices for full grid
-    vortex_y = min_idx[0] + ny//4
-    vortex_x = min_idx[1] + nx//4
+    vortex_y = min_idx[0] + ny // 4
+    vortex_x = min_idx[1] + nx // 4
 
     # Normalize to [0,1] domain
     vortex_x_norm = vortex_x / (nx - 1)
     vortex_y_norm = vortex_y / (ny - 1)
 
     return {
-        'max_velocity': np.max(vel_mag),
-        'min_velocity': np.min(vel_mag),
-        'mean_velocity': np.mean(vel_mag),
-        'vortex_center': (vortex_x_norm, vortex_y_norm),
+        "max_velocity": np.max(vel_mag),
+        "min_velocity": np.min(vel_mag),
+        "mean_velocity": np.mean(vel_mag),
+        "vortex_center": (vortex_x_norm, vortex_y_norm),
     }
 
 
@@ -88,13 +91,11 @@ def main():
         vel_mag = run_cavity_simulation(n, n, steps, output_dir=output_dir)
         analysis = analyze_results(vel_mag, n, n)
 
-        results.append({
-            'grid': n,
-            **analysis
-        })
+        results.append({"grid": n, **analysis})
 
         print(f"   Max velocity: {analysis['max_velocity']:.6f}")
-        print(f"   Vortex center: ({analysis['vortex_center'][0]:.3f}, {analysis['vortex_center'][1]:.3f})")
+        vx, vy = analysis["vortex_center"]
+        print(f"   Vortex center: ({vx:.3f}, {vy:.3f})")
 
     # Reference values (Ghia et al., 1982 for Re=100)
     print("\n2. Comparison with Reference Data")
@@ -104,7 +105,7 @@ def main():
     print()
 
     for r in results:
-        vx, vy = r['vortex_center']
+        vx, vy = r["vortex_center"]
         print(f"   Grid {r['grid']:3d}x{r['grid']:<3d}: vortex at ({vx:.3f}, {vy:.3f})")
 
     # Solver comparison

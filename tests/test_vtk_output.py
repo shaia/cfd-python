@@ -6,6 +6,7 @@ particularly the fixed use-after-free bug in write_vtk_vector.
 """
 
 import pytest
+
 import cfd_python
 
 
@@ -22,9 +23,12 @@ class TestWriteVtkScalar:
             filename=str(filename),
             field_name="pressure",
             data=data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
         )
         assert filename.exists()
         assert filename.stat().st_size > 0
@@ -39,9 +43,12 @@ class TestWriteVtkScalar:
             filename=str(filename),
             field_name="temperature",
             data=data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=2.0,
-            ymin=0.0, ymax=2.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=2.0,
+            ymin=0.0,
+            ymax=2.0,
         )
         assert filename.exists()
 
@@ -57,9 +64,12 @@ class TestWriteVtkScalar:
                 filename=str(filename),
                 field_name="pressure",
                 data=data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
 
     def test_write_vtk_scalar_repeated_calls(self, tmp_path):
@@ -73,9 +83,12 @@ class TestWriteVtkScalar:
                 filename=str(filename),
                 field_name="density",
                 data=data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
             assert filename.exists()
 
@@ -100,9 +113,12 @@ class TestWriteVtkVector:
             field_name="velocity",
             u_data=u_data,
             v_data=v_data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
         )
         assert filename.exists()
         assert filename.stat().st_size > 0
@@ -120,9 +136,12 @@ class TestWriteVtkVector:
             field_name="velocity",
             u_data=u_data,
             v_data=v_data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
         )
         assert filename.exists()
 
@@ -141,9 +160,12 @@ class TestWriteVtkVector:
                 field_name="velocity",
                 u_data=u_data,
                 v_data=v_data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
 
     def test_write_vtk_vector_wrong_v_size_raises(self, tmp_path):
@@ -161,9 +183,12 @@ class TestWriteVtkVector:
                 field_name="velocity",
                 u_data=u_data,
                 v_data=v_data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
 
     def test_write_vtk_vector_repeated_calls(self, tmp_path):
@@ -180,9 +205,12 @@ class TestWriteVtkVector:
                 field_name="velocity",
                 u_data=u_data,
                 v_data=v_data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
             assert filename.exists()
 
@@ -199,9 +227,12 @@ class TestWriteVtkVector:
             field_name="velocity",
             u_data=u_data,
             v_data=v_data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
         )
         assert filename.exists()
         # File should be substantial size
@@ -259,10 +290,11 @@ class TestWriteCsvTimeseries:
             u_data=u_data,
             v_data=v_data,
             p_data=p_data,
-            nx=nx, ny=ny,
+            nx=nx,
+            ny=ny,
             dt=0.001,
             iterations=100,
-            create_new=True
+            create_new=True,
         )
         assert filename.exists()
         assert filename.stat().st_size > 0
@@ -284,10 +316,11 @@ class TestWriteCsvTimeseries:
             u_data=u_data,
             v_data=v_data,
             p_data=p_data,
-            nx=nx, ny=ny,
+            nx=nx,
+            ny=ny,
             dt=0.001,
             iterations=100,
-            create_new=True
+            create_new=True,
         )
         initial_size = filename.stat().st_size
 
@@ -299,10 +332,11 @@ class TestWriteCsvTimeseries:
             u_data=u_data,
             v_data=v_data,
             p_data=p_data,
-            nx=nx, ny=ny,
+            nx=nx,
+            ny=ny,
             dt=0.001,
             iterations=101,
-            create_new=False
+            create_new=False,
         )
         # File should be larger after append
         assert filename.stat().st_size > initial_size
@@ -324,10 +358,11 @@ class TestWriteCsvTimeseries:
                 u_data=u_data,
                 v_data=v_data,
                 p_data=p_data,
-                nx=nx, ny=ny,
+                nx=nx,
+                ny=ny,
                 dt=0.001,
                 iterations=100 + step,
-                create_new=(step == 0)
+                create_new=(step == 0),
             )
 
 
@@ -338,7 +373,7 @@ class TestInputValidation:
         """Test that non-float values in list are handled."""
         nx, ny = 4, 4
         # Mix of ints and floats - should be converted
-        data = [i for i in range(nx * ny)]  # integers
+        data = list(range(nx * ny))  # integers
 
         filename = tmp_path / "test.vtk"
         # Should work - ints are convertible to float
@@ -346,9 +381,12 @@ class TestInputValidation:
             filename=str(filename),
             field_name="test",
             data=data,
-            nx=nx, ny=ny,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=nx,
+            ny=ny,
+            xmin=0.0,
+            xmax=1.0,
+            ymin=0.0,
+            ymax=1.0,
         )
         assert filename.exists()
 
@@ -364,9 +402,12 @@ class TestInputValidation:
                 filename=str(filename),
                 field_name="test",
                 data=data,
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0
+                nx=nx,
+                ny=ny,
+                xmin=0.0,
+                xmax=1.0,
+                ymin=0.0,
+                ymax=1.0,
             )
 
     def test_csv_timeseries_non_list_u_raises(self, tmp_path):
@@ -385,10 +426,11 @@ class TestInputValidation:
                 u_data="not a list",  # Invalid type
                 v_data=v_data,
                 p_data=p_data,
-                nx=nx, ny=ny,
+                nx=nx,
+                ny=ny,
                 dt=0.001,
                 iterations=100,
-                create_new=True
+                create_new=True,
             )
 
     def test_csv_timeseries_non_list_v_raises(self, tmp_path):
@@ -407,10 +449,11 @@ class TestInputValidation:
                 u_data=u_data,
                 v_data=(1, 2, 3),  # Tuple instead of list
                 p_data=p_data,
-                nx=nx, ny=ny,
+                nx=nx,
+                ny=ny,
                 dt=0.001,
                 iterations=100,
-                create_new=True
+                create_new=True,
             )
 
     def test_csv_timeseries_non_list_p_raises(self, tmp_path):
@@ -429,10 +472,11 @@ class TestInputValidation:
                 u_data=u_data,
                 v_data=v_data,
                 p_data=None,  # None instead of list
-                nx=nx, ny=ny,
+                nx=nx,
+                ny=ny,
                 dt=0.001,
                 iterations=100,
-                create_new=True
+                create_new=True,
             )
 
     def test_csv_timeseries_wrong_size_raises(self, tmp_path):
@@ -452,8 +496,9 @@ class TestInputValidation:
                 u_data=u_data,
                 v_data=v_data,
                 p_data=p_data,
-                nx=nx, ny=ny,
+                nx=nx,
+                ny=ny,
                 dt=0.001,
                 iterations=100,
-                create_new=True
+                create_new=True,
             )
