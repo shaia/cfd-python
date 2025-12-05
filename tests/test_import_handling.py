@@ -60,7 +60,7 @@ except ImportError as e:
         sys.path.insert(0, str(tmp_path))
         try:
             with pytest.raises(ImportError) as exc_info:
-                pass
+                import fake_cfd_broken  # noqa: F401
 
             # Verify the error message is helpful
             assert "Failed to load C extension" in str(exc_info.value)
