@@ -31,7 +31,7 @@ def load_extension():
         ExtensionNotBuiltError: If extension is not built (dev mode)
     """
     try:
-        from . import cfd_python as _cfd_module  # noqa: F401
+        from . import cfd_python as _cfd_module
         from .cfd_python import (
             OUTPUT_CSV_CENTERLINE,
             OUTPUT_CSV_STATISTICS,
