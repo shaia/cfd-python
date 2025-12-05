@@ -1,4 +1,4 @@
-"""CFD Python - Python bindings for CFD simulation library
+"""CFD Python - Python bindings for CFD simulation library.
 
 This package provides Python bindings for the C-based CFD simulation library,
 enabling high-performance computational fluid dynamics simulations from Python.
@@ -16,26 +16,17 @@ Output field types:
     - OUTPUT_CSV_STATISTICS: Global statistics (CSV)
 """
 
-# Get version from package metadata (setuptools-scm) or fall back to C module
-try:
-    from importlib.metadata import PackageNotFoundError, version
+from ._version import get_version
 
-    try:
-        __version__ = version("cfd-python")
-    except PackageNotFoundError:
-        # Package not installed, try C module version
-        __version__ = None
-except ImportError:
-    # Fallback for unusual environments where importlib.metadata is unavailable
-    __version__ = None
+__version__ = get_version()
 
-# Core exports that are always available
+# Core exports list (for documentation and dev mode)
 _CORE_EXPORTS = [
     # Simulation functions
     "run_simulation",
+    "run_simulation_with_params",
     "create_grid",
     "get_default_solver_params",
-    "run_simulation_with_params",
     # Solver functions
     "list_solvers",
     "has_solver",
@@ -54,71 +45,19 @@ _CORE_EXPORTS = [
     "OUTPUT_CSV_STATISTICS",
 ]
 
+# Load C extension and populate module namespace
 try:
-    # Import the C extension module to access dynamic solver constants
-    from . import cfd_python as _cfd_module
-    from .cfd_python import (
-        OUTPUT_CSV_CENTERLINE,
-        OUTPUT_CSV_STATISTICS,
-        OUTPUT_CSV_TIMESERIES,
-        OUTPUT_FULL_FIELD,
-        # Output type constants
-        OUTPUT_PRESSURE,
-        OUTPUT_VELOCITY,
-        create_grid,
-        get_default_solver_params,
-        get_solver_info,
-        has_solver,
-        # Solver functions
-        list_solvers,
-        # Simulation functions
-        run_simulation,
-        run_simulation_with_params,
-        # Output functions
-        set_output_dir,
-        write_csv_timeseries,
-        write_vtk_scalar,
-        write_vtk_vector,
-    )
+    from ._loader import load_extension
 
-    # Fall back to C module version if metadata lookup failed
-    if __version__ is None:
-        __version__ = getattr(_cfd_module, "__version__", "0.0.0")
+    _exports, _solver_constants = load_extension()
 
-    # Dynamically export all SOLVER_* constants from the C module
-    # This allows new solvers to be automatically available without
-    # updating this file
-    _solver_constants = []
-    for name in dir(_cfd_module):
-        if name.startswith("SOLVER_"):
-            globals()[name] = getattr(_cfd_module, name)
-            _solver_constants.append(name)
+    # Add all exports to module namespace
+    globals().update(_exports)
+    globals().update(_solver_constants)
 
-    # Build complete __all__ list
-    __all__ = _CORE_EXPORTS + _solver_constants
+    # Build __all__ with core exports + dynamic solver constants
+    __all__ = _CORE_EXPORTS + list(_solver_constants.keys())
 
-except ImportError as e:
-    # Check if this is a development environment (source checkout without built extension)
-    # vs a broken installation (extension exists but fails to load)
-    import os as _os
-
-    _package_dir = _os.path.dirname(__file__)
-
-    # Look for compiled extension files
-    _extension_exists = any(
-        f.startswith("cfd_python") and (f.endswith(".pyd") or f.endswith(".so"))
-        for f in _os.listdir(_package_dir)
-    )
-
-    if _extension_exists:
-        # Extension file exists but failed to load - this is an error
-        raise ImportError(
-            f"Failed to load cfd_python C extension: {e}\n"
-            "The extension file exists but could not be imported. "
-            "This may indicate a missing dependency or ABI incompatibility."
-        ) from e
-    else:
-        # Development mode - module not yet built
-        __all__ = _CORE_EXPORTS
-        if __version__ is None:
-            __version__ = "0.0.0-dev"
+except ImportError:
+    # Development mode - extension not built
+    __all__ = _CORE_EXPORTS
