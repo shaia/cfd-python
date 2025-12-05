@@ -47,7 +47,7 @@ _CORE_EXPORTS = [
 
 # Load C extension and populate module namespace
 try:
-    from ._loader import load_extension
+    from ._loader import ExtensionNotBuiltError, load_extension
 
     _exports, _solver_constants = load_extension()
 
@@ -58,6 +58,6 @@ try:
     # Build __all__ with core exports + dynamic solver constants
     __all__ = _CORE_EXPORTS + list(_solver_constants.keys())
 
-except ImportError:
-    # Development mode - extension not built
+except ExtensionNotBuiltError:
+    # Development mode - extension not built (this is expected)
     __all__ = _CORE_EXPORTS
