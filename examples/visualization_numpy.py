@@ -9,12 +9,14 @@ Note: This example uses only NumPy. For actual plotting,
 you would use matplotlib (see visualization_matplotlib.py).
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+import numpy as np
 
 import cfd_python
-import numpy as np
 
 
 def main():
@@ -27,9 +29,7 @@ def main():
     print("-" * 50)
 
     result = cfd_python.run_simulation(
-        nx=nx, ny=ny, steps=50,
-        xmin=0.0, xmax=1.0,
-        ymin=0.0, ymax=1.0
+        nx=nx, ny=ny, steps=50, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0
     )
 
     # Convert to NumPy array and reshape to 2D grid
@@ -82,13 +82,12 @@ def main():
     print("\n5. Quadrant Analysis")
     print("-" * 50)
 
-    q1 = vel_mag[:ny//2, :nx//2]  # Bottom-left
-    q2 = vel_mag[:ny//2, nx//2:]  # Bottom-right
-    q3 = vel_mag[ny//2:, :nx//2]  # Top-left
-    q4 = vel_mag[ny//2:, nx//2:]  # Top-right
+    q1 = vel_mag[: ny // 2, : nx // 2]  # Bottom-left
+    q2 = vel_mag[: ny // 2, nx // 2 :]  # Bottom-right
+    q3 = vel_mag[ny // 2 :, : nx // 2]  # Top-left
+    q4 = vel_mag[ny // 2 :, nx // 2 :]  # Top-right
 
-    quadrants = [("Bottom-left", q1), ("Bottom-right", q2),
-                 ("Top-left", q3), ("Top-right", q4)]
+    quadrants = [("Bottom-left", q1), ("Bottom-right", q2), ("Top-left", q3), ("Top-right", q4)]
 
     for name, q in quadrants:
         print(f"   {name:12s}: mean={np.mean(q):.6f}, max={np.max(q):.6f}")
@@ -113,8 +112,8 @@ def main():
     print("-" * 50)
 
     grid_info = cfd_python.create_grid(nx, ny, 0.0, 1.0, 0.0, 1.0)
-    x = np.array(grid_info['x_coords'])
-    y = np.array(grid_info['y_coords'])
+    x = np.array(grid_info["x_coords"])
+    y = np.array(grid_info["y_coords"])
     X, Y = np.meshgrid(x, y)
 
     print(f"   X range: [{X.min():.3f}, {X.max():.3f}]")
@@ -126,15 +125,8 @@ def main():
 
     # Save as CSV for external tools
     output_file = "velocity_data.csv"
-    flat_data = np.column_stack([
-        X.flatten(),
-        Y.flatten(),
-        vel_mag.flatten()
-    ])
-    np.savetxt(output_file, flat_data,
-               delimiter=',',
-               header='x,y,velocity_magnitude',
-               comments='')
+    flat_data = np.column_stack([X.flatten(), Y.flatten(), vel_mag.flatten()])
+    np.savetxt(output_file, flat_data, delimiter=",", header="x,y,velocity_magnitude", comments="")
     print(f"   Saved to: {output_file}")
     print(f"   Shape: {flat_data.shape}")
 

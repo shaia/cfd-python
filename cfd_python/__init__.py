@@ -18,7 +18,8 @@ Output field types:
 
 # Get version from package metadata (setuptools-scm) or fall back to C module
 try:
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError, version
+
     try:
         __version__ = version("cfd-python")
     except PackageNotFoundError:
@@ -54,36 +55,35 @@ _CORE_EXPORTS = [
 ]
 
 try:
+    # Import the C extension module to access dynamic solver constants
+    from . import cfd_python as _cfd_module
     from .cfd_python import (
-        # Simulation functions
-        run_simulation,
-        create_grid,
-        get_default_solver_params,
-        run_simulation_with_params,
-        # Solver functions
-        list_solvers,
-        has_solver,
-        get_solver_info,
-        # Output functions
-        set_output_dir,
-        write_vtk_scalar,
-        write_vtk_vector,
-        write_csv_timeseries,
+        OUTPUT_CSV_CENTERLINE,
+        OUTPUT_CSV_STATISTICS,
+        OUTPUT_CSV_TIMESERIES,
+        OUTPUT_FULL_FIELD,
         # Output type constants
         OUTPUT_PRESSURE,
         OUTPUT_VELOCITY,
-        OUTPUT_FULL_FIELD,
-        OUTPUT_CSV_TIMESERIES,
-        OUTPUT_CSV_CENTERLINE,
-        OUTPUT_CSV_STATISTICS,
+        create_grid,
+        get_default_solver_params,
+        get_solver_info,
+        has_solver,
+        # Solver functions
+        list_solvers,
+        # Simulation functions
+        run_simulation,
+        run_simulation_with_params,
+        # Output functions
+        set_output_dir,
+        write_csv_timeseries,
+        write_vtk_scalar,
+        write_vtk_vector,
     )
-
-    # Import the C extension module to access dynamic solver constants
-    from . import cfd_python as _cfd_module
 
     # Fall back to C module version if metadata lookup failed
     if __version__ is None:
-        __version__ = getattr(_cfd_module, '__version__', '0.0.0')
+        __version__ = getattr(_cfd_module, "__version__", "0.0.0")
 
     # Dynamically export all SOLVER_* constants from the C module
     # This allows new solvers to be automatically available without
@@ -101,11 +101,12 @@ except ImportError as e:
     # Check if this is a development environment (source checkout without built extension)
     # vs a broken installation (extension exists but fails to load)
     import os as _os
+
     _package_dir = _os.path.dirname(__file__)
 
     # Look for compiled extension files
     _extension_exists = any(
-        f.startswith('cfd_python') and (f.endswith('.pyd') or f.endswith('.so'))
+        f.startswith("cfd_python") and (f.endswith(".pyd") or f.endswith(".so"))
         for f in _os.listdir(_package_dir)
     )
 

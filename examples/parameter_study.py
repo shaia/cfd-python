@@ -6,12 +6,14 @@ Demonstrates how to run multiple simulations with varying parameters
 to study the effect of different settings on the solution.
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+import numpy as np
 
 import cfd_python
-import numpy as np
 
 
 def run_grid_convergence_study():
@@ -24,9 +26,7 @@ def run_grid_convergence_study():
 
     for n in grid_sizes:
         result = cfd_python.run_simulation(
-            nx=n, ny=n, steps=20,
-            xmin=0.0, xmax=1.0,
-            ymin=0.0, ymax=1.0
+            nx=n, ny=n, steps=20, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0
         )
         vel_array = np.array(result)
         max_vel = np.max(vel_array)
@@ -49,18 +49,13 @@ def run_timestep_study():
     for dt in dt_values:
         try:
             result = cfd_python.run_simulation_with_params(
-                nx=nx, ny=ny,
-                xmin=0.0, xmax=1.0,
-                ymin=0.0, ymax=1.0,
-                steps=10,
-                dt=dt,
-                cfl=0.5
+                nx=nx, ny=ny, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, steps=10, dt=dt, cfl=0.5
             )
-            vel_mag = result.get('velocity_magnitude', [])
+            vel_mag = result.get("velocity_magnitude", [])
             max_vel = max(vel_mag) if vel_mag else 0
             status = "OK"
         except Exception as e:
-            max_vel = float('nan')
+            max_vel = float("nan")
             status = f"Failed: {e}"
 
         results.append((dt, max_vel, status))
@@ -81,17 +76,14 @@ def run_solver_comparison():
 
     for solver_name in solvers:
         try:
-            result = cfd_python.run_simulation(
-                nx=nx, ny=ny, steps=steps,
-                solver_type=solver_name
-            )
+            result = cfd_python.run_simulation(nx=nx, ny=ny, steps=steps, solver_type=solver_name)
             vel_array = np.array(result)
             max_vel = np.max(vel_array)
             avg_vel = np.mean(vel_array)
             status = "OK"
-        except Exception as e:
-            max_vel = avg_vel = float('nan')
-            status = f"Failed"
+        except Exception:
+            max_vel = avg_vel = float("nan")
+            status = "Failed"
 
         results.append((solver_name, max_vel, avg_vel, status))
         print(f"   {solver_name:30s}: max={max_vel:.6f}, avg={avg_vel:.6f} [{status}]")
@@ -115,9 +107,7 @@ def run_domain_size_study():
 
     for xsize, ysize in domain_sizes:
         result = cfd_python.run_simulation(
-            nx=nx, ny=ny, steps=20,
-            xmin=0.0, xmax=xsize,
-            ymin=0.0, ymax=ysize
+            nx=nx, ny=ny, steps=20, xmin=0.0, xmax=xsize, ymin=0.0, ymax=ysize
         )
         vel_array = np.array(result)
         max_vel = np.max(vel_array)

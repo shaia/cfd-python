@@ -7,9 +7,10 @@ Solvers are registered at the C library level and automatically
 available in Python.
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import cfd_python
 
@@ -44,11 +45,11 @@ def main():
     print("-" * 50)
 
     solvers_to_check = [
-        'explicit_euler',
-        'explicit_euler_optimized',
-        'projection',
-        'explicit_euler_gpu',
-        'nonexistent_solver'
+        "explicit_euler",
+        "explicit_euler_optimized",
+        "projection",
+        "explicit_euler_gpu",
+        "nonexistent_solver",
     ]
 
     for name in solvers_to_check:
@@ -63,13 +64,13 @@ def main():
     print("  Solver constants are auto-generated from the registry:\n")
 
     # These constants are dynamically created when the module loads
-    if hasattr(cfd_python, 'SOLVER_EXPLICIT_EULER'):
+    if hasattr(cfd_python, "SOLVER_EXPLICIT_EULER"):
         print(f"  SOLVER_EXPLICIT_EULER = '{cfd_python.SOLVER_EXPLICIT_EULER}'")
 
-    if hasattr(cfd_python, 'SOLVER_EXPLICIT_EULER_OPTIMIZED'):
+    if hasattr(cfd_python, "SOLVER_EXPLICIT_EULER_OPTIMIZED"):
         print(f"  SOLVER_EXPLICIT_EULER_OPTIMIZED = '{cfd_python.SOLVER_EXPLICIT_EULER_OPTIMIZED}'")
 
-    if hasattr(cfd_python, 'SOLVER_PROJECTION'):
+    if hasattr(cfd_python, "SOLVER_PROJECTION"):
         print(f"  SOLVER_PROJECTION = '{cfd_python.SOLVER_PROJECTION}'")
 
     # Run simulation with different solvers
@@ -79,10 +80,7 @@ def main():
     for solver_name in solvers[:3]:  # Test first 3 solvers
         print(f"\n  Testing {solver_name}...")
         try:
-            result = cfd_python.run_simulation(
-                nx=10, ny=10, steps=5,
-                solver_type=solver_name
-            )
+            result = cfd_python.run_simulation(nx=10, ny=10, steps=5, solver_type=solver_name)
             max_vel = max(result) if result else 0
             print(f"    Success! Max velocity: {max_vel:.6f}")
         except Exception as e:

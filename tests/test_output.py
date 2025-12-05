@@ -1,7 +1,9 @@
 """
 Tests for VTK and CSV output functions
 """
+
 import pytest
+
 import cfd_python
 
 
@@ -15,8 +17,7 @@ class TestVTKOutput:
         data = [float(i) for i in range(nx * ny)]
 
         cfd_python.write_vtk_scalar(
-            str(output_file), "test_field", data,
-            nx, ny, 0.0, 1.0, 0.0, 1.0
+            str(output_file), "test_field", data, nx, ny, 0.0, 1.0, 0.0, 1.0
         )
 
         assert output_file.exists()
@@ -27,8 +28,15 @@ class TestVTKOutput:
         output_file = tmp_path / "test.vtk"
         with pytest.raises(ValueError):
             cfd_python.write_vtk_scalar(
-                str(output_file), "test", [1.0, 2.0, 3.0],  # 3 elements
-                5, 5, 0.0, 1.0, 0.0, 1.0  # expects 25 elements
+                str(output_file),
+                "test",
+                [1.0, 2.0, 3.0],  # 3 elements
+                5,
+                5,
+                0.0,
+                1.0,
+                0.0,
+                1.0,  # expects 25 elements
             )
 
     def test_write_vtk_vector(self, tmp_path):
@@ -39,8 +47,7 @@ class TestVTKOutput:
         v_data = [float(i) * 0.5 for i in range(nx * ny)]
 
         cfd_python.write_vtk_vector(
-            str(output_file), "velocity", u_data, v_data,
-            nx, ny, 0.0, 1.0, 0.0, 1.0
+            str(output_file), "velocity", u_data, v_data, nx, ny, 0.0, 1.0, 0.0, 1.0
         )
 
         assert output_file.exists()
@@ -51,10 +58,16 @@ class TestVTKOutput:
         output_file = tmp_path / "test.vtk"
         with pytest.raises(ValueError):
             cfd_python.write_vtk_vector(
-                str(output_file), "test",
+                str(output_file),
+                "test",
                 [1.0, 2.0],  # 2 elements
                 [1.0, 2.0, 3.0],  # 3 elements
-                5, 5, 0.0, 1.0, 0.0, 1.0
+                5,
+                5,
+                0.0,
+                1.0,
+                0.0,
+                1.0,
             )
 
 
@@ -71,10 +84,17 @@ class TestCSVOutput:
         p_data = [1.0] * size
 
         cfd_python.write_csv_timeseries(
-            str(output_file), step=0, time=0.0,
-            u_data=u_data, v_data=v_data, p_data=p_data,
-            nx=nx, ny=ny, dt=0.001, iterations=10,
-            create_new=True
+            str(output_file),
+            step=0,
+            time=0.0,
+            u_data=u_data,
+            v_data=v_data,
+            p_data=p_data,
+            nx=nx,
+            ny=ny,
+            dt=0.001,
+            iterations=10,
+            create_new=True,
         )
 
         assert output_file.exists()
@@ -91,19 +111,33 @@ class TestCSVOutput:
 
         # Create new file
         cfd_python.write_csv_timeseries(
-            str(output_file), step=0, time=0.0,
-            u_data=u_data, v_data=v_data, p_data=p_data,
-            nx=nx, ny=ny, dt=0.001, iterations=10,
-            create_new=True
+            str(output_file),
+            step=0,
+            time=0.0,
+            u_data=u_data,
+            v_data=v_data,
+            p_data=p_data,
+            nx=nx,
+            ny=ny,
+            dt=0.001,
+            iterations=10,
+            create_new=True,
         )
         initial_size = output_file.stat().st_size
 
         # Append to file
         cfd_python.write_csv_timeseries(
-            str(output_file), step=1, time=0.001,
-            u_data=u_data, v_data=v_data, p_data=p_data,
-            nx=nx, ny=ny, dt=0.001, iterations=10,
-            create_new=False
+            str(output_file),
+            step=1,
+            time=0.001,
+            u_data=u_data,
+            v_data=v_data,
+            p_data=p_data,
+            nx=nx,
+            ny=ny,
+            dt=0.001,
+            iterations=10,
+            create_new=False,
         )
 
         # File should be larger after append

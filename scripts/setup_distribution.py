@@ -6,11 +6,12 @@ This script helps set up the optimal distribution strategy for CFD Python.
 """
 
 import os
-import sys
-import subprocess
 import shlex
 import shutil
+import subprocess
+import sys
 from pathlib import Path
+
 
 def run_command(cmd, cwd=None, check=True, env=None):
     """Run a command and return the result.
@@ -30,8 +31,7 @@ def run_command(cmd, cwd=None, check=True, env=None):
 
     print(f"Running: {' '.join(args)}")
     try:
-        result = subprocess.run(args, cwd=cwd, check=check,
-                              capture_output=True, text=True, env=env)
+        result = subprocess.run(args, cwd=cwd, check=check, capture_output=True, text=True, env=env)
         if result.stdout:
             print(result.stdout)
         return result
@@ -40,6 +40,7 @@ def run_command(cmd, cwd=None, check=True, env=None):
         if e.stderr:
             print(f"stderr: {e.stderr}")
         raise
+
 
 def embed_c_library():
     """Embed the C library source code into the Python package"""
@@ -75,7 +76,7 @@ def embed_c_library():
     print(f"OK: Copied sources: {src_src} -> {src_dst}")
 
     # Create embedded CMakeLists.txt
-    cmake_content = '''
+    cmake_content = """
 # Embedded CFD Library
 cmake_minimum_required(VERSION 3.15)
 
@@ -96,7 +97,7 @@ set_target_properties(cfd_library PROPERTIES
     C_STANDARD 11
     POSITION_INDEPENDENT_CODE ON
 )
-'''
+"""
 
     cmake_file = target_dir / "CMakeLists.txt"
     cmake_file.write_text(cmake_content.strip())
@@ -104,11 +105,12 @@ set_target_properties(cfd_library PROPERTIES
 
     return True
 
+
 def update_main_cmake():
     """Update the main CMakeLists.txt to use embedded library"""
     print("Updating main CMakeLists.txt...")
 
-    cmake_content = '''cmake_minimum_required(VERSION 3.15...3.27)
+    cmake_content = """cmake_minimum_required(VERSION 3.15...3.27)
 
 project(cfd_python LANGUAGES C CXX)
 
@@ -170,13 +172,14 @@ endif()
 
 # Install the extension module in the cfd_python package directory
 install(TARGETS cfd_python DESTINATION cfd_python)
-'''
+"""
 
     cmake_file = Path("CMakeLists.txt")
     cmake_file.write_text(cmake_content.strip())
     print("OK: Updated main CMakeLists.txt")
 
     return True
+
 
 def build_wheels_locally():
     """Build wheels locally for testing"""
@@ -192,12 +195,10 @@ def build_wheels_locally():
     # Build wheels
     env = os.environ.copy()
     # Build only for current Python version for testing
-    env['CIBW_BUILD'] = f'cp{sys.version_info.major}{sys.version_info.minor}-*'
+    env["CIBW_BUILD"] = f"cp{sys.version_info.major}{sys.version_info.minor}-*"
 
     result = run_command(
-        ["python", "-m", "cibuildwheel", "--output-dir", "wheelhouse"],
-        check=False,
-        env=env
+        ["python", "-m", "cibuildwheel", "--output-dir", "wheelhouse"], check=False, env=env
     )
 
     if result.returncode == 0:
@@ -213,6 +214,7 @@ def build_wheels_locally():
     else:
         print("ERROR: Wheel building failed")
         return False
+
 
 def test_wheel_installation():
     """Test wheel installation in a clean environment"""
@@ -245,7 +247,7 @@ def test_wheel_installation():
 
     # Test the installation by writing script to a temp file
     # (avoids shell quoting issues with multi-line strings)
-    test_script = '''\
+    test_script = """\
 import cfd_python
 print(f"CFD Python version: {cfd_python.__version__}")
 
@@ -263,16 +265,14 @@ assert "dt" in params, "Solver params missing"
 print("OK: Solver params test passed")
 
 print("All tests passed!")
-'''
+"""
 
     # Write test script to a temporary file and execute it
     test_script_path = test_env / "test_install.py"
     test_script_path.write_text(test_script)
 
     result = subprocess.run(
-        [str(python_exe), str(test_script_path)],
-        capture_output=True,
-        text=True
+        [str(python_exe), str(test_script_path)], capture_output=True, text=True
     )
     if result.stdout:
         print(result.stdout)
@@ -289,12 +289,13 @@ print("All tests passed!")
         print("ERROR: Wheel testing failed")
         return False
 
+
 def setup_pypi_config():
     """Set up PyPI configuration files"""
     print("Setting up PyPI configuration...")
 
     # Create .pypirc template
-    pypirc_content = '''[distutils]
+    pypirc_content = """[distutils]
 index-servers =
     pypi
     testpypi
@@ -307,7 +308,7 @@ password = REPLACE_WITH_YOUR_PYPI_TOKEN
 repository = https://test.pypi.org/legacy/
 username = __token__
 password = REPLACE_WITH_YOUR_TEST_PYPI_TOKEN
-'''
+"""
 
     print("PyPI configuration template:")
     print("1. Create ~/.pypirc with your PyPI tokens")
@@ -317,6 +318,7 @@ password = REPLACE_WITH_YOUR_TEST_PYPI_TOKEN
     Path(".pypirc.template").write_text(pypirc_content.strip())
 
     return True
+
 
 def main():
     """Main setup function"""
@@ -353,6 +355,7 @@ def main():
 
     print("\nERROR: Distribution setup incomplete")
     return False
+
 
 if __name__ == "__main__":
     main()

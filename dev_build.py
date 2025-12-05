@@ -10,10 +10,11 @@ Usage:
     python build.py clean        # Clean build artifacts
     python build.py all          # Clean, build, install, and test
 """
+
+import argparse
+import shutil
 import subprocess
 import sys
-import shutil
-import argparse
 from pathlib import Path
 
 # Project paths
@@ -116,7 +117,12 @@ def clean():
 def verify():
     """Verify the installation works"""
     print("\n=== Verifying Installation ===")
-    result = run(f'{sys.executable} -c "import cfd_python; print(f\'Version: {{cfd_python.__version__}}\'); print(f\'Solvers: {{cfd_python.list_solvers()}}\')"', check=False)
+    verify_cmd = (
+        f'{sys.executable} -c "import cfd_python; '
+        f"print(f'Version: {{cfd_python.__version__}}'); "
+        f"print(f'Solvers: {{cfd_python.list_solvers()}}')\""
+    )
+    result = run(verify_cmd, check=False)
     return result.returncode == 0
 
 
@@ -127,7 +133,7 @@ def main():
         nargs="?",
         default="develop",
         choices=["build", "install", "develop", "test", "clean", "all", "verify", "cfd"],
-        help="Command to run (default: develop)"
+        help="Command to run (default: develop)",
     )
 
     args = parser.parse_args()
