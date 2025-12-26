@@ -47,8 +47,32 @@ jobs:
       - name: Install build dependencies
         run: uv pip install --system build scikit-build-core setuptools-scm
 
-      - name: Build CFD library (Unix)
-        if: runner.os != 'Windows'
+      - name: Install CUDA Toolkit (Linux)
+        if: runner.os == 'Linux'
+        uses: Jimver/cuda-toolkit@v0.2.18
+        id: cuda-toolkit
+        with:
+          cuda: '12.6.2'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart"]'
+
+      - name: Build CFD library (Linux with CUDA)
+        if: runner.os == 'Linux'
+        run: |
+          # Build with CUDA for all major architectures (sm_50+ covers GTX 900 series onwards)
+          # 50=Maxwell, 60=Pascal, 70=Volta, 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
+          cmake -S cfd -B cfd/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCFD_ENABLE_CUDA=ON \
+            -DCFD_CUDA_ARCHITECTURES="50;60;70;75;80;86;89;90"
+          cmake --build cfd/build --config Release
+          echo "=== CFD library built with CUDA ==="
+          ls -la cfd/build/lib/
+
+      - name: Build CFD library (macOS)
+        if: runner.os == 'macOS'
         run: |
           cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build cfd/build --config Release

@@ -136,5 +136,26 @@ if(OpenMP_C_FOUND)
     target_link_libraries(cfd_python PRIVATE OpenMP::OpenMP_C)
 endif()
 
+# Link CUDA runtime if the CFD library was built with CUDA support
+# Check if cudart library exists in the CFD build directory
+find_library(CUDART_LIBRARY
+    NAMES cudart cudart_static
+    PATHS ${CFD_LIBRARY_DIRS}
+    NO_DEFAULT_PATH
+)
+if(CUDART_LIBRARY)
+    message(STATUS "Found CUDA runtime in CFD build: ${CUDART_LIBRARY}")
+    target_link_libraries(cfd_python PRIVATE ${CUDART_LIBRARY})
+else()
+    # Try system CUDA if available
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        message(STATUS "Found system CUDA toolkit, linking cudart")
+        target_link_libraries(cfd_python PRIVATE CUDA::cudart)
+    else()
+        message(STATUS "CUDA not found - GPU solvers will not be available")
+    endif()
+endif()
+
 # Install the extension module
 install(TARGETS cfd_python DESTINATION cfd_python)
