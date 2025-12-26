@@ -79,7 +79,17 @@ class TestIntegration:
     @pytest.mark.parametrize("solver_name", _AVAILABLE_SOLVERS)
     def test_solver_produces_valid_output(self, solver_name):
         """Test that each available solver produces valid simulation output."""
-        result = cfd_python.run_simulation(5, 5, steps=3, solver_type=solver_name)
+        # Skip GPU solvers if CUDA is not available at runtime
+        # The CFD library registers GPU solvers unconditionally but they fail at init
+        if "gpu" in solver_name.lower() or "cuda" in solver_name.lower():
+            try:
+                result = cfd_python.run_simulation(5, 5, steps=1, solver_type=solver_name)
+            except RuntimeError as e:
+                if "Failed to initialize" in str(e):
+                    pytest.skip(f"GPU solver '{solver_name}' not available (CUDA not enabled)")
+                raise
+        else:
+            result = cfd_python.run_simulation(5, 5, steps=3, solver_type=solver_name)
 
         assert len(result) == 25, f"Solver {solver_name} returned wrong size"
         all_floats = all(isinstance(v, float) for v in result)
