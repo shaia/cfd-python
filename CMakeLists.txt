@@ -31,7 +31,9 @@ else()
 endif()
 message(STATUS "CFD_ROOT_DIR: ${CFD_ROOT_DIR}")
 
+# Source headers in lib/include, generated headers (cfd_export.h) in build/lib/include
 set(CFD_INCLUDE_DIR "${CFD_ROOT_DIR}/lib/include")
+set(CFD_BUILD_INCLUDE_DIR "${CFD_ROOT_DIR}/build/lib/include")
 set(CFD_LIBRARY_DIRS
     "${CFD_ROOT_DIR}/build/lib/Release"
     "${CFD_ROOT_DIR}/build/lib"
@@ -113,6 +115,7 @@ endif()
 
 target_include_directories(cfd_python PRIVATE
     ${CFD_INCLUDE_DIR}
+    ${CFD_BUILD_INCLUDE_DIR}
     ${Python_INCLUDE_DIRS}
 )
 
