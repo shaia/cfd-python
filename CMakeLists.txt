@@ -52,6 +52,14 @@ endif()
 message(STATUS "Found CFD library: ${CFD_LIBRARY}")
 message(STATUS "CFD include dir: ${CFD_INCLUDE_DIR}")
 
+# Find OpenMP - the CFD library uses OpenMP for parallel backends
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    message(STATUS "OpenMP found: ${OpenMP_C_FLAGS}")
+else()
+    message(STATUS "OpenMP not found - parallel backends will not be available")
+endif()
+
 # Create the Python extension module
 # For stable ABI on Windows, we need to manually create the library
 # to avoid Python_add_library linking against version-specific python3X.lib
@@ -122,6 +130,11 @@ target_include_directories(cfd_python PRIVATE
 target_link_libraries(cfd_python PRIVATE
     ${CFD_LIBRARY}
 )
+
+# Link OpenMP if available (required for CFD library's parallel backends)
+if(OpenMP_C_FOUND)
+    target_link_libraries(cfd_python PRIVATE OpenMP::OpenMP_C)
+endif()
 
 # Install the extension module
 install(TARGETS cfd_python DESTINATION cfd_python)
