@@ -79,12 +79,26 @@ jobs:
           echo "=== CFD library built ==="
           ls -la cfd/build/lib/
 
-      - name: Build CFD library (Windows)
+      - name: Install CUDA Toolkit (Windows)
+        if: runner.os == 'Windows'
+        uses: Jimver/cuda-toolkit@v0.2.18
+        id: cuda-toolkit-windows
+        with:
+          cuda: '12.6.2'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "visual_studio_integration"]'
+
+      - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows'
         run: |
-          cmake -S cfd -B cfd/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          # Build with CUDA for all major architectures
+          cmake -S cfd -B cfd/build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DCFD_ENABLE_CUDA=ON `
+            -DCFD_CUDA_ARCHITECTURES="50;60;70;75;80;86;89;90"
           cmake --build cfd/build --config Release
-          echo "=== CFD library built ==="
+          echo "=== CFD library built with CUDA ==="
           dir cfd\build\lib\Release
 
       - name: Build wheel (Unix)
