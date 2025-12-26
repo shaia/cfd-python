@@ -9,7 +9,8 @@ on:
 
 env:
   # CFD C library version to build against
-  CFD_VERSION: "v0.1.5"
+  # Using fix branch until merged to release - guards GPU solver registration
+  CFD_VERSION: "fix/guard-gpu-solver-registration"
 
 jobs:
   build_wheel:
