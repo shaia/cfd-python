@@ -2,10 +2,13 @@ name: Build and Test Wheels
 
 on:
   push:
-    branches: [main, master]
   pull_request:
   workflow_dispatch:
   workflow_call:
+
+env:
+  # CFD C library version to build against
+  CFD_VERSION: "v0.1.5"
 
 jobs:
   build_wheel:
@@ -24,6 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/cfd
+          ref: ${{ env.CFD_VERSION }}
           path: cfd
           fetch-depth: 0
 
