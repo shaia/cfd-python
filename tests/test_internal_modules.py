@@ -171,7 +171,7 @@ class TestLoaderModule:
         exports, _ = load_extension()
 
         output_constants = [
-            "OUTPUT_PRESSURE",
+            "OUTPUT_VELOCITY_MAGNITUDE",
             "OUTPUT_VELOCITY",
             "OUTPUT_FULL_FIELD",
             "OUTPUT_CSV_TIMESERIES",

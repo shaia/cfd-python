@@ -9,12 +9,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Include CFD library headers
-#include "grid.h"
-#include "solver_interface.h"
-#include "simulation_api.h"
-#include "vtk_output.h"
-#include "csv_output.h"
+// Include CFD library headers (v0.1.5+ API)
+#include "cfd/core/grid.h"
+#include "cfd/core/cfd_status.h"
+#include "cfd/core/derived_fields.h"
+#include "cfd/solvers/navier_stokes_solver.h"
+#include "cfd/api/simulation_api.h"
+#include "cfd/io/vtk_output.h"
+#include "cfd/io/csv_output.h"
+#include "cfd/boundary/boundary_conditions.h"
+
+// Module-level solver registry (context-bound)
+static ns_solver_registry_t* g_registry = NULL;
+
+/*
+ * Helper to raise CFD errors as Python exceptions
+ */
+static PyObject* raise_cfd_error(cfd_status_t status, const char* context) {
+    const char* error_msg = cfd_get_last_error();
+    const char* status_str = cfd_get_error_string(status);
+
+    if (error_msg && error_msg[0] != '\0') {
+        PyErr_Format(PyExc_RuntimeError, "%s: %s (%s)", context, error_msg, status_str);
+    } else {
+        PyErr_Format(PyExc_RuntimeError, "%s: %s", context, status_str);
+    }
+
+    cfd_clear_error();
+    return NULL;
+}
 
 /*
  * List available solvers
@@ -23,8 +46,13 @@ static PyObject* list_solvers(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
 
+    if (g_registry == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Solver registry not initialized");
+        return NULL;
+    }
+
     const char* names[32];
-    int count = simulation_list_solvers(names, 32);
+    int count = cfd_registry_list(g_registry, names, 32);
 
     PyObject* solver_list = PyList_New(0);
     if (solver_list == NULL) {
@@ -54,7 +82,12 @@ static PyObject* has_solver(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    int available = simulation_has_solver(solver_type);
+    if (g_registry == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Solver registry not initialized");
+        return NULL;
+    }
+
+    int available = cfd_registry_has(g_registry, solver_type);
     return PyBool_FromLong(available);
 }
 
@@ -69,8 +102,13 @@ static PyObject* get_solver_info(PyObject* self, PyObject* args) {
         return NULL;
     }
 
+    if (g_registry == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Solver registry not initialized");
+        return NULL;
+    }
+
     // Create a temporary solver to get its info
-    Solver* solver = solver_create(solver_type);
+    ns_solver_t* solver = cfd_solver_create(g_registry, solver_type);
     if (solver == NULL) {
         PyErr_Format(PyExc_ValueError, "Unknown solver type: %s", solver_type);
         return NULL;
@@ -116,13 +154,13 @@ static PyObject* get_solver_info(PyObject* self, PyObject* args) {
         } \
     } while(0)
 
-    APPEND_CAP(caps, SOLVER_CAP_INCOMPRESSIBLE, "incompressible");
-    APPEND_CAP(caps, SOLVER_CAP_COMPRESSIBLE, "compressible");
-    APPEND_CAP(caps, SOLVER_CAP_STEADY_STATE, "steady_state");
-    APPEND_CAP(caps, SOLVER_CAP_TRANSIENT, "transient");
-    APPEND_CAP(caps, SOLVER_CAP_SIMD, "simd");
-    APPEND_CAP(caps, SOLVER_CAP_PARALLEL, "parallel");
-    APPEND_CAP(caps, SOLVER_CAP_GPU, "gpu");
+    APPEND_CAP(caps, NS_SOLVER_CAP_INCOMPRESSIBLE, "incompressible");
+    APPEND_CAP(caps, NS_SOLVER_CAP_COMPRESSIBLE, "compressible");
+    APPEND_CAP(caps, NS_SOLVER_CAP_STEADY_STATE, "steady_state");
+    APPEND_CAP(caps, NS_SOLVER_CAP_TRANSIENT, "transient");
+    APPEND_CAP(caps, NS_SOLVER_CAP_SIMD, "simd");
+    APPEND_CAP(caps, NS_SOLVER_CAP_PARALLEL, "parallel");
+    APPEND_CAP(caps, NS_SOLVER_CAP_GPU, "gpu");
 
     #undef APPEND_CAP
 
@@ -151,7 +189,7 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
         return NULL;
     }
 
-    SimulationData* sim_data;
+    simulation_data* sim_data;
     if (solver_type) {
         sim_data = init_simulation_with_solver(nx, ny, xmin, xmax, ymin, ymax, solver_type);
     } else {
@@ -180,33 +218,40 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
                             sim_data->grid->ymin, sim_data->grid->ymax);
     }
 
-    // Get velocity magnitude for return
-    FlowField* field = sim_data->field;
-    double* vel_mag = calculate_velocity_magnitude(field, field->nx, field->ny);
+    // Compute velocity magnitude using derived_fields
+    flow_field* field = sim_data->field;
+    derived_fields* derived = derived_fields_create(field->nx, field->ny);
+    if (derived == NULL) {
+        free_simulation(sim_data);
+        PyErr_SetString(PyExc_MemoryError, "Failed to create derived fields");
+        return NULL;
+    }
+
+    derived_fields_compute_velocity_magnitude(derived, field);
 
     PyObject* result = PyList_New(0);
     if (result == NULL) {
-        free(vel_mag);
+        derived_fields_destroy(derived);
         free_simulation(sim_data);
         return NULL;
     }
 
-    if (vel_mag != NULL) {
+    if (derived->velocity_magnitude != NULL) {
         size_t size = field->nx * field->ny;
         for (size_t i = 0; i < size; i++) {
-            PyObject* val = PyFloat_FromDouble(vel_mag[i]);
+            PyObject* val = PyFloat_FromDouble(derived->velocity_magnitude[i]);
             if (val == NULL || PyList_Append(result, val) < 0) {
                 Py_XDECREF(val);
                 Py_DECREF(result);
-                free(vel_mag);
+                derived_fields_destroy(derived);
                 free_simulation(sim_data);
                 return NULL;
             }
             Py_DECREF(val);
         }
-        free(vel_mag);
     }
 
+    derived_fields_destroy(derived);
     free_simulation(sim_data);
     return result;
 }
@@ -244,35 +289,35 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
     size_t nx = (size_t)nx_signed;
     size_t ny = (size_t)ny_signed;
 
-    Grid* grid = grid_create(nx, ny, xmin, xmax, ymin, ymax);
-    if (grid == NULL) {
+    grid* g = grid_create(nx, ny, xmin, xmax, ymin, ymax);
+    if (g == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to create grid");
         return NULL;
     }
 
-    grid_initialize_uniform(grid);
+    grid_initialize_uniform(g);
 
     // Return grid information as a dictionary
     PyObject* grid_dict = PyDict_New();
     if (grid_dict == NULL) {
-        grid_destroy(grid);
+        grid_destroy(g);
         return NULL;
     }
 
     // Helper macro to add values to dict with proper refcount
     #define ADD_TO_DICT(dict, key, py_val) do { \
         PyObject* tmp = (py_val); \
-        if (tmp == NULL) { Py_DECREF(dict); grid_destroy(grid); return NULL; } \
+        if (tmp == NULL) { Py_DECREF(dict); grid_destroy(g); return NULL; } \
         PyDict_SetItemString(dict, key, tmp); \
         Py_DECREF(tmp); \
     } while(0)
 
-    ADD_TO_DICT(grid_dict, "nx", PyLong_FromSize_t(grid->nx));
-    ADD_TO_DICT(grid_dict, "ny", PyLong_FromSize_t(grid->ny));
-    ADD_TO_DICT(grid_dict, "xmin", PyFloat_FromDouble(grid->xmin));
-    ADD_TO_DICT(grid_dict, "xmax", PyFloat_FromDouble(grid->xmax));
-    ADD_TO_DICT(grid_dict, "ymin", PyFloat_FromDouble(grid->ymin));
-    ADD_TO_DICT(grid_dict, "ymax", PyFloat_FromDouble(grid->ymax));
+    ADD_TO_DICT(grid_dict, "nx", PyLong_FromSize_t(g->nx));
+    ADD_TO_DICT(grid_dict, "ny", PyLong_FromSize_t(g->ny));
+    ADD_TO_DICT(grid_dict, "xmin", PyFloat_FromDouble(g->xmin));
+    ADD_TO_DICT(grid_dict, "xmax", PyFloat_FromDouble(g->xmax));
+    ADD_TO_DICT(grid_dict, "ymin", PyFloat_FromDouble(g->ymin));
+    ADD_TO_DICT(grid_dict, "ymax", PyFloat_FromDouble(g->ymax));
 
     #undef ADD_TO_DICT
 
@@ -283,31 +328,31 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
         Py_XDECREF(x_list);
         Py_XDECREF(y_list);
         Py_DECREF(grid_dict);
-        grid_destroy(grid);
+        grid_destroy(g);
         return NULL;
     }
 
-    for (size_t i = 0; i < grid->nx; i++) {
-        PyObject* val = PyFloat_FromDouble(grid->x[i]);
+    for (size_t i = 0; i < g->nx; i++) {
+        PyObject* val = PyFloat_FromDouble(g->x[i]);
         if (val == NULL || PyList_Append(x_list, val) < 0) {
             Py_XDECREF(val);
             Py_DECREF(x_list);
             Py_DECREF(y_list);
             Py_DECREF(grid_dict);
-            grid_destroy(grid);
+            grid_destroy(g);
             return NULL;
         }
         Py_DECREF(val);
     }
 
-    for (size_t i = 0; i < grid->ny; i++) {
-        PyObject* val = PyFloat_FromDouble(grid->y[i]);
+    for (size_t i = 0; i < g->ny; i++) {
+        PyObject* val = PyFloat_FromDouble(g->y[i]);
         if (val == NULL || PyList_Append(y_list, val) < 0) {
             Py_XDECREF(val);
             Py_DECREF(x_list);
             Py_DECREF(y_list);
             Py_DECREF(grid_dict);
-            grid_destroy(grid);
+            grid_destroy(g);
             return NULL;
         }
         Py_DECREF(val);
@@ -318,7 +363,7 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
     Py_DECREF(x_list);
     Py_DECREF(y_list);
 
-    grid_destroy(grid);
+    grid_destroy(g);
     return grid_dict;
 }
 
@@ -328,7 +373,7 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
 static PyObject* get_default_solver_params(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
-    SolverParams params = solver_params_default();
+    ns_solver_params_t params = ns_solver_params_default();
 
     PyObject* params_dict = PyDict_New();
     if (params_dict == NULL) {
@@ -375,7 +420,7 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
         return NULL;
     }
 
-    SimulationData* sim_data;
+    simulation_data* sim_data;
     if (solver_type) {
         sim_data = init_simulation_with_solver(nx, ny, xmin, xmax, ymin, ymax, solver_type);
     } else {
@@ -407,34 +452,37 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
         return NULL;
     }
 
-    // Get velocity magnitude
-    FlowField* field = sim_data->field;
-    double* vel_mag = calculate_velocity_magnitude(field, field->nx, field->ny);
+    // Compute velocity magnitude using derived_fields
+    flow_field* field = sim_data->field;
+    derived_fields* derived = derived_fields_create(field->nx, field->ny);
+    if (derived != NULL) {
+        derived_fields_compute_velocity_magnitude(derived, field);
 
-    if (vel_mag != NULL) {
-        size_t size = field->nx * field->ny;
-        PyObject* vel_list = PyList_New(0);
-        if (vel_list == NULL) {
-            free(vel_mag);
-            Py_DECREF(results);
-            free_simulation(sim_data);
-            return NULL;
-        }
-        for (size_t i = 0; i < size; i++) {
-            PyObject* val = PyFloat_FromDouble(vel_mag[i]);
-            if (val == NULL || PyList_Append(vel_list, val) < 0) {
-                Py_XDECREF(val);
-                Py_DECREF(vel_list);
+        if (derived->velocity_magnitude != NULL) {
+            size_t size = field->nx * field->ny;
+            PyObject* vel_list = PyList_New(0);
+            if (vel_list == NULL) {
+                derived_fields_destroy(derived);
                 Py_DECREF(results);
-                free(vel_mag);
                 free_simulation(sim_data);
                 return NULL;
             }
-            Py_DECREF(val);
+            for (size_t i = 0; i < size; i++) {
+                PyObject* val = PyFloat_FromDouble(derived->velocity_magnitude[i]);
+                if (val == NULL || PyList_Append(vel_list, val) < 0) {
+                    Py_XDECREF(val);
+                    Py_DECREF(vel_list);
+                    derived_fields_destroy(derived);
+                    Py_DECREF(results);
+                    free_simulation(sim_data);
+                    return NULL;
+                }
+                Py_DECREF(val);
+            }
+            PyDict_SetItemString(results, "velocity_magnitude", vel_list);
+            Py_DECREF(vel_list);
         }
-        PyDict_SetItemString(results, "velocity_magnitude", vel_list);
-        Py_DECREF(vel_list);
-        free(vel_mag);
+        derived_fields_destroy(derived);
     }
 
     // Helper macro to add values to dict with proper refcount
@@ -451,14 +499,14 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
     ADD_TO_DICT(results, "steps", PyLong_FromSize_t(steps));
 
     // Add solver info
-    Solver* solver = simulation_get_solver(sim_data);
+    ns_solver_t* solver = simulation_get_solver(sim_data);
     if (solver) {
         ADD_TO_DICT(results, "solver_name", PyUnicode_FromString(solver->name));
         ADD_TO_DICT(results, "solver_description", PyUnicode_FromString(solver->description));
     }
 
     // Add solver statistics
-    const SolverStats* stats = simulation_get_stats(sim_data);
+    const ns_solver_stats_t* stats = simulation_get_stats(sim_data);
     if (stats) {
         PyObject* stats_dict = PyDict_New();
         if (stats_dict == NULL) {
@@ -516,7 +564,11 @@ static PyObject* set_output_dir(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    simulation_set_output_dir(output_dir);
+    // Note: This function now requires a simulation_data context
+    // For now, we'll warn that this is a no-op without a simulation context
+    PyErr_WarnEx(PyExc_DeprecationWarning,
+                 "set_output_dir() without simulation context is deprecated. "
+                 "Use simulation_data.output_base_dir instead.", 1);
     Py_RETURN_NONE;
 }
 
@@ -683,7 +735,7 @@ static PyObject* write_csv_timeseries_py(PyObject* self, PyObject* args, PyObjec
     }
 
     // Allocate and populate flow field
-    FlowField* field = flow_field_create(nx, ny);
+    flow_field* field = flow_field_create(nx, ny);
     if (field == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
         return NULL;
@@ -706,15 +758,701 @@ static PyObject* write_csv_timeseries_py(PyObject* self, PyObject* args, PyObjec
         }
     }
 
-    SolverParams params = solver_params_default();
+    ns_solver_params_t params = ns_solver_params_default();
     params.dt = dt;
 
-    SolverStats stats = solver_stats_default();
+    ns_solver_stats_t stats = ns_solver_stats_default();
     stats.iterations = iterations;
 
-    write_csv_timeseries(filename, step, time, field, &params, &stats, nx, ny, create_new);
+    // New API: write_csv_timeseries takes derived_fields* (can be NULL)
+    write_csv_timeseries(filename, step, time, field, NULL, &params, &stats, nx, ny, create_new);
 
     flow_field_destroy(field);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Get last CFD error
+ */
+static PyObject* get_last_error(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    const char* error = cfd_get_last_error();
+    if (error && error[0] != '\0') {
+        return PyUnicode_FromString(error);
+    }
+    Py_RETURN_NONE;
+}
+
+/*
+ * Get last CFD status code
+ */
+static PyObject* get_last_status(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    cfd_status_t status = cfd_get_last_status();
+    return PyLong_FromLong((long)status);
+}
+
+/*
+ * Clear CFD error state
+ */
+static PyObject* clear_error(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    cfd_clear_error();
+    Py_RETURN_NONE;
+}
+
+/*
+ * Get error string for status code
+ */
+static PyObject* get_error_string(PyObject* self, PyObject* args) {
+    (void)self;
+    int status;
+
+    if (!PyArg_ParseTuple(args, "i", &status)) {
+        return NULL;
+    }
+
+    const char* str = cfd_get_error_string((cfd_status_t)status);
+    return PyUnicode_FromString(str);
+}
+
+/* ============================================================================
+ * BOUNDARY CONDITIONS API
+ * ============================================================================ */
+
+/*
+ * Get current BC backend
+ */
+static PyObject* bc_get_backend_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+    return PyLong_FromLong((long)bc_get_backend());
+}
+
+/*
+ * Get BC backend name as string
+ */
+static PyObject* bc_get_backend_name_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+    return PyUnicode_FromString(bc_get_backend_name());
+}
+
+/*
+ * Set BC backend
+ */
+static PyObject* bc_set_backend_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    bool success = bc_set_backend((bc_backend_t)backend);
+    return PyBool_FromLong(success);
+}
+
+/*
+ * Check if BC backend is available
+ */
+static PyObject* bc_backend_available_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    bool available = bc_backend_available((bc_backend_t)backend);
+    return PyBool_FromLong(available);
+}
+
+/*
+ * Apply boundary conditions to scalar field
+ */
+static PyObject* bc_apply_scalar_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"field", "nx", "ny", "bc_type", NULL};
+    PyObject* field_list;
+    size_t nx, ny;
+    int bc_type;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Onni", kwlist,
+                                     &field_list, &nx, &ny, &bc_type)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(field_list)) {
+        PyErr_SetString(PyExc_TypeError, "field must be a list");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(field_list) != size) {
+        PyErr_Format(PyExc_ValueError, "field size (%zd) must match nx*ny (%zu)",
+                     PyList_Size(field_list), size);
+        return NULL;
+    }
+
+    // Convert list to C array
+    double* field = (double*)malloc(size * sizeof(double));
+    if (field == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate field array");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        PyObject* item = PyList_GetItem(field_list, i);
+        field[i] = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            free(field);
+            return NULL;
+        }
+    }
+
+    // Apply BC
+    cfd_status_t status = bc_apply_scalar(field, nx, ny, (bc_type_t)bc_type);
+    if (status != CFD_SUCCESS) {
+        free(field);
+        return raise_cfd_error(status, "bc_apply_scalar");
+    }
+
+    // Copy back to list
+    for (size_t i = 0; i < size; i++) {
+        PyObject* val = PyFloat_FromDouble(field[i]);
+        if (val == NULL) {
+            free(field);
+            return NULL;
+        }
+        if (PyList_SetItem(field_list, i, val) < 0) {
+            free(field);
+            return NULL;
+        }
+    }
+
+    free(field);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply boundary conditions to velocity fields
+ */
+static PyObject* bc_apply_velocity_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"u", "v", "nx", "ny", "bc_type", NULL};
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+    int bc_type;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOnni", kwlist,
+                                     &u_list, &v_list, &nx, &ny, &bc_type)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "u and v sizes must match nx*ny");
+        return NULL;
+    }
+
+    // Convert lists to C arrays
+    double* u = (double*)malloc(size * sizeof(double));
+    double* v = (double*)malloc(size * sizeof(double));
+    if (u == NULL || v == NULL) {
+        free(u);
+        free(v);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate velocity arrays");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            free(u);
+            free(v);
+            return NULL;
+        }
+    }
+
+    // Apply BC
+    cfd_status_t status = bc_apply_velocity(u, v, nx, ny, (bc_type_t)bc_type);
+    if (status != CFD_SUCCESS) {
+        free(u);
+        free(v);
+        return raise_cfd_error(status, "bc_apply_velocity");
+    }
+
+    // Copy back to lists
+    for (size_t i = 0; i < size; i++) {
+        PyObject* u_val = PyFloat_FromDouble(u[i]);
+        PyObject* v_val = PyFloat_FromDouble(v[i]);
+        if (u_val == NULL || v_val == NULL) {
+            Py_XDECREF(u_val);
+            Py_XDECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        PyList_SetItem(u_list, i, u_val);
+        PyList_SetItem(v_list, i, v_val);
+    }
+
+    free(u);
+    free(v);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply Dirichlet boundary conditions to scalar field
+ */
+static PyObject* bc_apply_dirichlet_scalar_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"field", "nx", "ny", "left", "right", "bottom", "top", NULL};
+    PyObject* field_list;
+    size_t nx, ny;
+    double left, right, bottom, top;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Onndddd", kwlist,
+                                     &field_list, &nx, &ny, &left, &right, &bottom, &top)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(field_list)) {
+        PyErr_SetString(PyExc_TypeError, "field must be a list");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(field_list) != size) {
+        PyErr_Format(PyExc_ValueError, "field size (%zd) must match nx*ny (%zu)",
+                     PyList_Size(field_list), size);
+        return NULL;
+    }
+
+    // Convert list to C array
+    double* field = (double*)malloc(size * sizeof(double));
+    if (field == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate field array");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        field[i] = PyFloat_AsDouble(PyList_GetItem(field_list, i));
+        if (PyErr_Occurred()) {
+            free(field);
+            return NULL;
+        }
+    }
+
+    // Apply Dirichlet BC
+    bc_dirichlet_values_t values = {.left = left, .right = right, .bottom = bottom, .top = top};
+    cfd_status_t status = bc_apply_dirichlet_scalar(field, nx, ny, &values);
+    if (status != CFD_SUCCESS) {
+        free(field);
+        return raise_cfd_error(status, "bc_apply_dirichlet_scalar");
+    }
+
+    // Copy back to list
+    for (size_t i = 0; i < size; i++) {
+        PyObject* val = PyFloat_FromDouble(field[i]);
+        if (val == NULL) {
+            free(field);
+            return NULL;
+        }
+        PyList_SetItem(field_list, i, val);
+    }
+
+    free(field);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply no-slip boundary conditions to velocity fields
+ */
+static PyObject* bc_apply_noslip_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"u", "v", "nx", "ny", NULL};
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOnn", kwlist,
+                                     &u_list, &v_list, &nx, &ny)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "u and v sizes must match nx*ny");
+        return NULL;
+    }
+
+    // Convert lists to C arrays
+    double* u = (double*)malloc(size * sizeof(double));
+    double* v = (double*)malloc(size * sizeof(double));
+    if (u == NULL || v == NULL) {
+        free(u);
+        free(v);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate velocity arrays");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            free(u);
+            free(v);
+            return NULL;
+        }
+    }
+
+    // Apply no-slip BC
+    cfd_status_t status = bc_apply_noslip(u, v, nx, ny);
+    if (status != CFD_SUCCESS) {
+        free(u);
+        free(v);
+        return raise_cfd_error(status, "bc_apply_noslip");
+    }
+
+    // Copy back to lists
+    for (size_t i = 0; i < size; i++) {
+        PyObject* u_val = PyFloat_FromDouble(u[i]);
+        PyObject* v_val = PyFloat_FromDouble(v[i]);
+        if (u_val == NULL || v_val == NULL) {
+            Py_XDECREF(u_val);
+            Py_XDECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        PyList_SetItem(u_list, i, u_val);
+        PyList_SetItem(v_list, i, v_val);
+    }
+
+    free(u);
+    free(v);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply inlet boundary conditions
+ */
+static PyObject* bc_apply_inlet_uniform_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"u", "v", "nx", "ny", "u_inlet", "v_inlet", "edge", NULL};
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+    double u_inlet, v_inlet;
+    int edge = BC_EDGE_LEFT;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOnndd|i", kwlist,
+                                     &u_list, &v_list, &nx, &ny, &u_inlet, &v_inlet, &edge)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "u and v sizes must match nx*ny");
+        return NULL;
+    }
+
+    // Convert lists to C arrays
+    double* u = (double*)malloc(size * sizeof(double));
+    double* v = (double*)malloc(size * sizeof(double));
+    if (u == NULL || v == NULL) {
+        free(u);
+        free(v);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate velocity arrays");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            free(u);
+            free(v);
+            return NULL;
+        }
+    }
+
+    // Create inlet config and apply
+    bc_inlet_config_t config = bc_inlet_config_uniform(u_inlet, v_inlet);
+    bc_inlet_set_edge(&config, (bc_edge_t)edge);
+
+    cfd_status_t status = bc_apply_inlet(u, v, nx, ny, &config);
+    if (status != CFD_SUCCESS) {
+        free(u);
+        free(v);
+        return raise_cfd_error(status, "bc_apply_inlet");
+    }
+
+    // Copy back to lists
+    for (size_t i = 0; i < size; i++) {
+        PyObject* u_val = PyFloat_FromDouble(u[i]);
+        PyObject* v_val = PyFloat_FromDouble(v[i]);
+        if (u_val == NULL || v_val == NULL) {
+            Py_XDECREF(u_val);
+            Py_XDECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        PyList_SetItem(u_list, i, u_val);
+        PyList_SetItem(v_list, i, v_val);
+    }
+
+    free(u);
+    free(v);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply parabolic inlet boundary conditions
+ */
+static PyObject* bc_apply_inlet_parabolic_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"u", "v", "nx", "ny", "max_velocity", "edge", NULL};
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+    double max_velocity;
+    int edge = BC_EDGE_LEFT;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOnnd|i", kwlist,
+                                     &u_list, &v_list, &nx, &ny, &max_velocity, &edge)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "u and v sizes must match nx*ny");
+        return NULL;
+    }
+
+    // Convert lists to C arrays
+    double* u = (double*)malloc(size * sizeof(double));
+    double* v = (double*)malloc(size * sizeof(double));
+    if (u == NULL || v == NULL) {
+        free(u);
+        free(v);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate velocity arrays");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            free(u);
+            free(v);
+            return NULL;
+        }
+    }
+
+    // Create parabolic inlet config and apply
+    bc_inlet_config_t config = bc_inlet_config_parabolic(max_velocity);
+    bc_inlet_set_edge(&config, (bc_edge_t)edge);
+
+    cfd_status_t status = bc_apply_inlet(u, v, nx, ny, &config);
+    if (status != CFD_SUCCESS) {
+        free(u);
+        free(v);
+        return raise_cfd_error(status, "bc_apply_inlet");
+    }
+
+    // Copy back to lists
+    for (size_t i = 0; i < size; i++) {
+        PyObject* u_val = PyFloat_FromDouble(u[i]);
+        PyObject* v_val = PyFloat_FromDouble(v[i]);
+        if (u_val == NULL || v_val == NULL) {
+            Py_XDECREF(u_val);
+            Py_XDECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        PyList_SetItem(u_list, i, u_val);
+        PyList_SetItem(v_list, i, v_val);
+    }
+
+    free(u);
+    free(v);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply outlet (zero-gradient) boundary conditions to scalar field
+ */
+static PyObject* bc_apply_outlet_scalar_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"field", "nx", "ny", "edge", NULL};
+    PyObject* field_list;
+    size_t nx, ny;
+    int edge = BC_EDGE_RIGHT;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Onn|i", kwlist,
+                                     &field_list, &nx, &ny, &edge)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(field_list)) {
+        PyErr_SetString(PyExc_TypeError, "field must be a list");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(field_list) != size) {
+        PyErr_Format(PyExc_ValueError, "field size (%zd) must match nx*ny (%zu)",
+                     PyList_Size(field_list), size);
+        return NULL;
+    }
+
+    // Convert list to C array
+    double* field = (double*)malloc(size * sizeof(double));
+    if (field == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate field array");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        field[i] = PyFloat_AsDouble(PyList_GetItem(field_list, i));
+        if (PyErr_Occurred()) {
+            free(field);
+            return NULL;
+        }
+    }
+
+    // Create outlet config and apply
+    bc_outlet_config_t config = bc_outlet_config_zero_gradient();
+    bc_outlet_set_edge(&config, (bc_edge_t)edge);
+
+    cfd_status_t status = bc_apply_outlet_scalar(field, nx, ny, &config);
+    if (status != CFD_SUCCESS) {
+        free(field);
+        return raise_cfd_error(status, "bc_apply_outlet_scalar");
+    }
+
+    // Copy back to list
+    for (size_t i = 0; i < size; i++) {
+        PyObject* val = PyFloat_FromDouble(field[i]);
+        if (val == NULL) {
+            free(field);
+            return NULL;
+        }
+        PyList_SetItem(field_list, i, val);
+    }
+
+    free(field);
+    Py_RETURN_NONE;
+}
+
+/*
+ * Apply outlet boundary conditions to velocity fields
+ */
+static PyObject* bc_apply_outlet_velocity_py(PyObject* self, PyObject* args, PyObject* kwds) {
+    (void)self;
+    static char* kwlist[] = {"u", "v", "nx", "ny", "edge", NULL};
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+    int edge = BC_EDGE_RIGHT;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOnn|i", kwlist,
+                                     &u_list, &v_list, &nx, &ny, &edge)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "u and v sizes must match nx*ny");
+        return NULL;
+    }
+
+    // Convert lists to C arrays
+    double* u = (double*)malloc(size * sizeof(double));
+    double* v = (double*)malloc(size * sizeof(double));
+    if (u == NULL || v == NULL) {
+        free(u);
+        free(v);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate velocity arrays");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            free(u);
+            free(v);
+            return NULL;
+        }
+    }
+
+    // Create outlet config and apply
+    bc_outlet_config_t config = bc_outlet_config_zero_gradient();
+    bc_outlet_set_edge(&config, (bc_edge_t)edge);
+
+    cfd_status_t status = bc_apply_outlet_velocity(u, v, nx, ny, &config);
+    if (status != CFD_SUCCESS) {
+        free(u);
+        free(v);
+        return raise_cfd_error(status, "bc_apply_outlet_velocity");
+    }
+
+    // Copy back to lists
+    for (size_t i = 0; i < size; i++) {
+        PyObject* u_val = PyFloat_FromDouble(u[i]);
+        PyObject* v_val = PyFloat_FromDouble(v[i]);
+        if (u_val == NULL || v_val == NULL) {
+            Py_XDECREF(u_val);
+            Py_XDECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        PyList_SetItem(u_list, i, u_val);
+        PyList_SetItem(v_list, i, v_val);
+    }
+
+    free(u);
+    free(v);
     Py_RETURN_NONE;
 }
 
@@ -786,7 +1524,8 @@ static PyMethodDef cfd_python_methods[] = {
     {"set_output_dir", set_output_dir, METH_VARARGS,
      "Set the base output directory for simulation outputs.\n\n"
      "Args:\n"
-     "    output_dir (str): Base directory path for outputs"},
+     "    output_dir (str): Base directory path for outputs\n\n"
+     "Note: Deprecated. Use simulation context instead."},
     {"write_vtk_scalar", (PyCFunction)write_vtk_scalar, METH_VARARGS | METH_KEYWORDS,
      "Write scalar field data to VTK file.\n\n"
      "Args:\n"
@@ -817,13 +1556,116 @@ static PyMethodDef cfd_python_methods[] = {
      "    dt (float): Time step size\n"
      "    iterations (int): Solver iterations\n"
      "    create_new (bool): True to create new file, False to append"},
+    {"get_last_error", get_last_error, METH_NOARGS,
+     "Get the last CFD library error message.\n\n"
+     "Returns:\n"
+     "    str or None: Error message, or None if no error"},
+    {"get_last_status", get_last_status, METH_NOARGS,
+     "Get the last CFD library status code.\n\n"
+     "Returns:\n"
+     "    int: Status code (0 = success, negative = error)"},
+    {"clear_error", clear_error, METH_NOARGS,
+     "Clear the CFD library error state."},
+    {"get_error_string", get_error_string, METH_VARARGS,
+     "Get human-readable string for a status code.\n\n"
+     "Args:\n"
+     "    status (int): Status code\n\n"
+     "Returns:\n"
+     "    str: Description of the status code"},
+    // Boundary Conditions API
+    {"bc_get_backend", bc_get_backend_py, METH_NOARGS,
+     "Get the current BC backend.\n\n"
+     "Returns:\n"
+     "    int: Backend type (BC_BACKEND_AUTO, BC_BACKEND_SCALAR, etc.)"},
+    {"bc_get_backend_name", bc_get_backend_name_py, METH_NOARGS,
+     "Get the name of the current BC backend.\n\n"
+     "Returns:\n"
+     "    str: Backend name (e.g., 'scalar', 'simd', 'omp')"},
+    {"bc_set_backend", bc_set_backend_py, METH_VARARGS,
+     "Set the BC backend.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    bool: True if backend was set successfully"},
+    {"bc_backend_available", bc_backend_available_py, METH_VARARGS,
+     "Check if a BC backend is available.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    bool: True if backend is available"},
+    {"bc_apply_scalar", (PyCFunction)bc_apply_scalar_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply boundary conditions to a scalar field.\n\n"
+     "Args:\n"
+     "    field (list): Scalar field data (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    bc_type (int): Boundary condition type constant"},
+    {"bc_apply_velocity", (PyCFunction)bc_apply_velocity_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply boundary conditions to velocity fields.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field (modified in-place)\n"
+     "    v (list): Y-velocity field (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    bc_type (int): Boundary condition type constant"},
+    {"bc_apply_dirichlet", (PyCFunction)bc_apply_dirichlet_scalar_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply Dirichlet (fixed value) boundary conditions.\n\n"
+     "Args:\n"
+     "    field (list): Scalar field data (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    left (float): Value at left boundary\n"
+     "    right (float): Value at right boundary\n"
+     "    bottom (float): Value at bottom boundary\n"
+     "    top (float): Value at top boundary"},
+    {"bc_apply_noslip", (PyCFunction)bc_apply_noslip_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply no-slip wall boundary conditions (zero velocity).\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field (modified in-place)\n"
+     "    v (list): Y-velocity field (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction"},
+    {"bc_apply_inlet_uniform", (PyCFunction)bc_apply_inlet_uniform_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply uniform inlet velocity boundary condition.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field (modified in-place)\n"
+     "    v (list): Y-velocity field (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    u_inlet (float): X-velocity at inlet\n"
+     "    v_inlet (float): Y-velocity at inlet\n"
+     "    edge (int, optional): Boundary edge (default: BC_EDGE_LEFT)"},
+    {"bc_apply_inlet_parabolic", (PyCFunction)bc_apply_inlet_parabolic_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply parabolic inlet velocity profile.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field (modified in-place)\n"
+     "    v (list): Y-velocity field (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    max_velocity (float): Maximum velocity at profile center\n"
+     "    edge (int, optional): Boundary edge (default: BC_EDGE_LEFT)"},
+    {"bc_apply_outlet_scalar", (PyCFunction)bc_apply_outlet_scalar_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply outlet (zero-gradient) boundary condition to scalar field.\n\n"
+     "Args:\n"
+     "    field (list): Scalar field data (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    edge (int, optional): Boundary edge (default: BC_EDGE_RIGHT)"},
+    {"bc_apply_outlet_velocity", (PyCFunction)bc_apply_outlet_velocity_py, METH_VARARGS | METH_KEYWORDS,
+     "Apply outlet (zero-gradient) boundary condition to velocity fields.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field (modified in-place)\n"
+     "    v (list): Y-velocity field (modified in-place)\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    edge (int, optional): Boundary edge (default: BC_EDGE_RIGHT)"},
     {NULL, NULL, 0, NULL}
 };
 
 static struct PyModuleDef cfd_python_module = {
     PyModuleDef_HEAD_INIT,
     "cfd_python",
-    "Python bindings for CFD simulation library with pluggable solver support.\n\n"
+    "Python bindings for CFD simulation library v0.1.5+ with pluggable solver support.\n\n"
     "Available functions:\n"
     "  - list_solvers(): Get available solver types\n"
     "  - has_solver(name): Check if a solver exists\n"
@@ -832,15 +1674,21 @@ static struct PyModuleDef cfd_python_module = {
     "  - run_simulation_with_params(...): Run with detailed parameters\n"
     "  - create_grid(...): Create a computational grid\n"
     "  - get_default_solver_params(): Get default parameters\n"
-    "  - set_output_dir(path): Set output directory\n"
+    "  - set_output_dir(path): Set output directory (deprecated)\n"
     "  - write_vtk_scalar(...): Write scalar VTK output\n"
     "  - write_vtk_vector(...): Write vector VTK output\n"
-    "  - write_csv_timeseries(...): Write CSV timeseries\n\n"
+    "  - write_csv_timeseries(...): Write CSV timeseries\n"
+    "  - get_last_error(): Get last error message\n"
+    "  - get_last_status(): Get last status code\n"
+    "  - clear_error(): Clear error state\n"
+    "  - get_error_string(code): Get error description\n\n"
     "Available solver types:\n"
     "  - 'explicit_euler': Basic finite difference solver\n"
     "  - 'explicit_euler_optimized': SIMD-optimized solver\n"
+    "  - 'explicit_euler_omp': OpenMP parallel Euler solver\n"
     "  - 'projection': Pressure-velocity projection solver\n"
     "  - 'projection_optimized': Optimized projection solver\n"
+    "  - 'projection_omp': OpenMP parallel projection solver\n"
     "  - 'explicit_euler_gpu': GPU-accelerated Euler solver\n"
     "  - 'projection_jacobi_gpu': GPU-accelerated projection solver",
     -1,
@@ -854,18 +1702,24 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
     }
 
     // Add version info
-    if (PyModule_AddStringConstant(m, "__version__", "0.3.0") < 0) {
+    if (PyModule_AddStringConstant(m, "__version__", "0.2.0") < 0) {
         Py_DECREF(m);
         return NULL;
     }
 
-    // Initialize the solver registry so solvers are available
-    solver_registry_init();
+    // Create and initialize the solver registry (context-bound API)
+    g_registry = cfd_registry_create();
+    if (g_registry == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create solver registry");
+        Py_DECREF(m);
+        return NULL;
+    }
+    cfd_registry_register_defaults(g_registry);
 
     // Dynamically add solver type constants from the registry
     // This automatically picks up any new solvers added to the C library
     const char* solver_names[32];
-    int solver_count = solver_registry_list(solver_names, 32);
+    int solver_count = cfd_registry_list(g_registry, solver_names, 32);
     for (int i = 0; i < solver_count; i++) {
         // Convert solver name to uppercase constant name
         // e.g., "explicit_euler" -> "SOLVER_EXPLICIT_EULER"
@@ -900,13 +1754,56 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         }
     }
 
-    // Add output field type constants (these are defined in simulation_api.h enum)
-    if (PyModule_AddIntConstant(m, "OUTPUT_PRESSURE", OUTPUT_PRESSURE) < 0 ||
+    // Add output field type constants (new API uses OUTPUT_VELOCITY_MAGNITUDE instead of OUTPUT_PRESSURE)
+    if (PyModule_AddIntConstant(m, "OUTPUT_VELOCITY_MAGNITUDE", OUTPUT_VELOCITY_MAGNITUDE) < 0 ||
         PyModule_AddIntConstant(m, "OUTPUT_VELOCITY", OUTPUT_VELOCITY) < 0 ||
         PyModule_AddIntConstant(m, "OUTPUT_FULL_FIELD", OUTPUT_FULL_FIELD) < 0 ||
         PyModule_AddIntConstant(m, "OUTPUT_CSV_TIMESERIES", OUTPUT_CSV_TIMESERIES) < 0 ||
         PyModule_AddIntConstant(m, "OUTPUT_CSV_CENTERLINE", OUTPUT_CSV_CENTERLINE) < 0 ||
         PyModule_AddIntConstant(m, "OUTPUT_CSV_STATISTICS", OUTPUT_CSV_STATISTICS) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add status code constants
+    if (PyModule_AddIntConstant(m, "CFD_SUCCESS", CFD_SUCCESS) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR", CFD_ERROR) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_NOMEM", CFD_ERROR_NOMEM) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_INVALID", CFD_ERROR_INVALID) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_IO", CFD_ERROR_IO) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_UNSUPPORTED", CFD_ERROR_UNSUPPORTED) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_DIVERGED", CFD_ERROR_DIVERGED) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_MAX_ITER", CFD_ERROR_MAX_ITER) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add boundary condition type constants
+    if (PyModule_AddIntConstant(m, "BC_TYPE_PERIODIC", BC_TYPE_PERIODIC) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_NEUMANN", BC_TYPE_NEUMANN) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_DIRICHLET", BC_TYPE_DIRICHLET) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_NOSLIP", BC_TYPE_NOSLIP) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_INLET", BC_TYPE_INLET) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_OUTLET", BC_TYPE_OUTLET) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add boundary edge constants
+    if (PyModule_AddIntConstant(m, "BC_EDGE_LEFT", BC_EDGE_LEFT) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_RIGHT", BC_EDGE_RIGHT) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_BOTTOM", BC_EDGE_BOTTOM) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_TOP", BC_EDGE_TOP) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add boundary condition backend constants
+    if (PyModule_AddIntConstant(m, "BC_BACKEND_AUTO", BC_BACKEND_AUTO) < 0 ||
+        PyModule_AddIntConstant(m, "BC_BACKEND_SCALAR", BC_BACKEND_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "BC_BACKEND_OMP", BC_BACKEND_OMP) < 0 ||
+        PyModule_AddIntConstant(m, "BC_BACKEND_SIMD", BC_BACKEND_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "BC_BACKEND_CUDA", BC_BACKEND_CUDA) < 0) {
         Py_DECREF(m);
         return NULL;
     }

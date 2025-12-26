@@ -1,4 +1,4 @@
-"""CFD Python - Python bindings for CFD simulation library.
+"""CFD Python - Python bindings for CFD simulation library v0.1.5+.
 
 This package provides Python bindings for the C-based CFD simulation library,
 enabling high-performance computational fluid dynamics simulations from Python.
@@ -8,12 +8,55 @@ to see all available solvers at runtime. Solver constants (SOLVER_*) are
 automatically generated from registered solvers.
 
 Output field types:
-    - OUTPUT_PRESSURE: Pressure/velocity magnitude field (VTK)
+    - OUTPUT_VELOCITY_MAGNITUDE: Velocity magnitude scalar field (VTK)
     - OUTPUT_VELOCITY: Velocity vector field (VTK)
     - OUTPUT_FULL_FIELD: Complete flow field (VTK)
     - OUTPUT_CSV_TIMESERIES: Time series data (CSV)
     - OUTPUT_CSV_CENTERLINE: Centerline profile (CSV)
     - OUTPUT_CSV_STATISTICS: Global statistics (CSV)
+
+Error handling:
+    - CFD_SUCCESS: Operation successful (0)
+    - CFD_ERROR: Generic error (-1)
+    - CFD_ERROR_NOMEM: Out of memory (-2)
+    - CFD_ERROR_INVALID: Invalid argument (-3)
+    - CFD_ERROR_IO: File I/O error (-4)
+    - CFD_ERROR_UNSUPPORTED: Operation not supported (-5)
+    - CFD_ERROR_DIVERGED: Solver diverged (-6)
+    - CFD_ERROR_MAX_ITER: Max iterations reached (-7)
+    - get_last_error(): Get last error message
+    - get_last_status(): Get last status code
+    - get_error_string(code): Get error description
+    - clear_error(): Clear error state
+
+Boundary conditions:
+    Types:
+        - BC_TYPE_PERIODIC: Periodic boundaries
+        - BC_TYPE_NEUMANN: Zero-gradient boundaries
+        - BC_TYPE_DIRICHLET: Fixed value boundaries
+        - BC_TYPE_NOSLIP: No-slip wall (zero velocity)
+        - BC_TYPE_INLET: Inlet velocity specification
+        - BC_TYPE_OUTLET: Outlet conditions
+
+    Edges:
+        - BC_EDGE_LEFT, BC_EDGE_RIGHT, BC_EDGE_BOTTOM, BC_EDGE_TOP
+
+    Backends:
+        - BC_BACKEND_AUTO: Auto-select best available
+        - BC_BACKEND_SCALAR: Single-threaded scalar
+        - BC_BACKEND_OMP: OpenMP parallel
+        - BC_BACKEND_SIMD: SIMD + OpenMP (AVX2/NEON)
+        - BC_BACKEND_CUDA: GPU acceleration
+
+    Functions:
+        - bc_apply_scalar(field, nx, ny, bc_type): Apply BC to scalar field
+        - bc_apply_velocity(u, v, nx, ny, bc_type): Apply BC to velocity
+        - bc_apply_dirichlet(field, nx, ny, left, right, bottom, top): Fixed values
+        - bc_apply_noslip(u, v, nx, ny): Zero velocity at walls
+        - bc_apply_inlet_uniform(u, v, nx, ny, u_inlet, v_inlet, edge): Uniform inlet
+        - bc_apply_inlet_parabolic(u, v, nx, ny, max_velocity, edge): Parabolic inlet
+        - bc_apply_outlet_scalar(field, nx, ny, edge): Zero-gradient outlet
+        - bc_apply_outlet_velocity(u, v, nx, ny, edge): Zero-gradient outlet
 """
 
 from ._version import get_version
@@ -37,12 +80,56 @@ _CORE_EXPORTS = [
     "write_vtk_vector",
     "write_csv_timeseries",
     # Output type constants
-    "OUTPUT_PRESSURE",
     "OUTPUT_VELOCITY",
+    "OUTPUT_VELOCITY_MAGNITUDE",
     "OUTPUT_FULL_FIELD",
     "OUTPUT_CSV_TIMESERIES",
     "OUTPUT_CSV_CENTERLINE",
     "OUTPUT_CSV_STATISTICS",
+    # Error handling API
+    "CFD_SUCCESS",
+    "CFD_ERROR",
+    "CFD_ERROR_NOMEM",
+    "CFD_ERROR_INVALID",
+    "CFD_ERROR_IO",
+    "CFD_ERROR_UNSUPPORTED",
+    "CFD_ERROR_DIVERGED",
+    "CFD_ERROR_MAX_ITER",
+    "get_last_error",
+    "get_last_status",
+    "get_error_string",
+    "clear_error",
+    # Boundary condition type constants
+    "BC_TYPE_PERIODIC",
+    "BC_TYPE_NEUMANN",
+    "BC_TYPE_DIRICHLET",
+    "BC_TYPE_NOSLIP",
+    "BC_TYPE_INLET",
+    "BC_TYPE_OUTLET",
+    # Boundary edge constants
+    "BC_EDGE_LEFT",
+    "BC_EDGE_RIGHT",
+    "BC_EDGE_BOTTOM",
+    "BC_EDGE_TOP",
+    # Boundary condition backend constants
+    "BC_BACKEND_AUTO",
+    "BC_BACKEND_SCALAR",
+    "BC_BACKEND_OMP",
+    "BC_BACKEND_SIMD",
+    "BC_BACKEND_CUDA",
+    # Boundary condition functions
+    "bc_get_backend",
+    "bc_get_backend_name",
+    "bc_set_backend",
+    "bc_backend_available",
+    "bc_apply_scalar",
+    "bc_apply_velocity",
+    "bc_apply_dirichlet",
+    "bc_apply_noslip",
+    "bc_apply_inlet_uniform",
+    "bc_apply_inlet_parabolic",
+    "bc_apply_outlet_scalar",
+    "bc_apply_outlet_velocity",
 ]
 
 # Load C extension and populate module namespace
