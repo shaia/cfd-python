@@ -59,14 +59,14 @@ jobs:
       - name: Build CFD library (Linux with CUDA)
         if: runner.os == 'Linux'
         run: |
-          # Build with CUDA for all major architectures (sm_50+ covers GTX 900 series onwards)
-          # 50=Maxwell, 60=Pascal, 70=Volta, 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
+          # Build with CUDA for Turing+ architectures (RTX 20 series onwards)
+          # 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
           cmake -S cfd -B cfd/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DCFD_ENABLE_CUDA=ON \
-            -DCFD_CUDA_ARCHITECTURES="50;60;70;75;80;86;89;90"
+            -DCFD_CUDA_ARCHITECTURES="75;80;86;89;90"
           cmake --build cfd/build --config Release
           echo "=== CFD library built with CUDA ==="
           ls -la cfd/build/lib/
@@ -91,12 +91,12 @@ jobs:
       - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows'
         run: |
-          # Build with CUDA for all major architectures
+          # Build with CUDA for Turing+ architectures (RTX 20 series onwards)
           cmake -S cfd -B cfd/build `
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_SHARED_LIBS=OFF `
             -DCFD_ENABLE_CUDA=ON `
-            -DCFD_CUDA_ARCHITECTURES="50;60;70;75;80;86;89;90"
+            -DCFD_CUDA_ARCHITECTURES="75;80;86;89;90"
           cmake --build cfd/build --config Release
           echo "=== CFD library built with CUDA ==="
           dir cfd\build\lib\Release
