@@ -162,24 +162,6 @@ jobs:
           echo "=== Wheel built ==="
           dir dist
 
-      - name: Rename wheel for variant
-        shell: bash
-        run: |
-          # Rename wheel to include variant suffix (cpu or cuda)
-          for wheel in dist/*.whl; do
-            if [ -f "$wheel" ]; then
-              # Extract parts: name-version-pyver-abi-platform.whl
-              basename=$(basename "$wheel" .whl)
-              # Insert variant before platform tag
-              # e.g., cfd_python-0.1.0-cp39-cp39-linux_x86_64.whl
-              # becomes cfd_python-0.1.0-cp39-cp39-linux_x86_64+${{ matrix.variant }}.whl
-              newname="${basename}+${{ matrix.variant }}.whl"
-              mv "$wheel" "dist/$newname"
-              echo "Renamed to: $newname"
-            fi
-          done
-          ls -la dist/
-
       - name: Inspect wheel contents
         run: |
           python -c "
@@ -191,6 +173,9 @@ jobs:
                       print(name)
           "
 
+      # Upload wheels with variant in artifact name
+      # Note: Wheel filenames are standard (no variant suffix) to comply with PEP 427
+      # The variant (cpu/cuda) is encoded in the artifact name for differentiation
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.os }}-${{ matrix.variant }}
