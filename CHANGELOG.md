@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CMake library detection for CFD v0.1.6 static builds
 - Wheel installation compatibility with Python stable ABI (abi3) wheels
 - Removed non-standard wheel filename modifications for PEP 427 compliance
+- CUDA toolkit installation by installing GCC 11 before CUDA on Linux
+- Simplified CUDA toolkit installation by removing sub-packages parameter
+- Test code style: moved pytest imports to module level for consistency
 
 ## [0.1.0] - 2025-12-26
 
