@@ -2,6 +2,8 @@
 Tests for boundary condition bindings in cfd_python.
 """
 
+import pytest
+
 import cfd_python
 
 
@@ -202,8 +204,6 @@ class TestBCApplyScalar:
 
     def test_bc_apply_scalar_invalid_size(self):
         """Test bc_apply_scalar with mismatched size raises error"""
-        import pytest
-
         nx, ny = 4, 4
         field = [0.0] * 8  # Wrong size (should be 16)
 
