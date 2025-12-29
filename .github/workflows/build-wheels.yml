@@ -247,14 +247,14 @@ jobs:
       - name: Install wheel (Unix)
         if: runner.os != 'Windows'
         run: |
-          uv pip install --system dist/*.whl
-          uv pip install --system pytest numpy
+          python -m pip install dist/*.whl
+          python -m pip install pytest numpy
 
       - name: Install wheel (Windows)
         if: runner.os == 'Windows'
         run: |
-          uv pip install --system (Get-ChildItem dist/*.whl).FullName
-          uv pip install --system pytest numpy
+          python -m pip install (Get-ChildItem dist/*.whl).FullName
+          python -m pip install pytest numpy
 
       - name: Test import (Unix)
         if: runner.os != 'Windows'
