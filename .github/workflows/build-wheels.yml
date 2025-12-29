@@ -94,6 +94,14 @@ jobs:
           dir cfd\build\lib\Release
 
       # ============ CUDA builds ============
+      - name: Install GCC for CUDA (Linux)
+        if: runner.os == 'Linux' && matrix.variant == 'cuda'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-11 g++-11
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+
       - name: Install CUDA Toolkit (Linux)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
         uses: Jimver/cuda-toolkit@v0.2.18
