@@ -260,6 +260,9 @@ cpu_features_t cfd_get_cpu_features(void);
   - Added CFD library version check (require >= 0.1.5)
   - Added `CFD_BUILD_INCLUDE_DIR` for generated export header
   - Find CFD library headers in correct paths
+  - **v0.1.6 update:** Link modular backend libraries (cfd_api, cfd_core, cfd_scalar, cfd_simd, cfd_omp, cfd_cuda)
+  - **v0.1.6 update:** Added GNU linker groups on Linux for circular dependency resolution
+  - **v0.1.6 update:** Automatic CUDA library detection for optional GPU support
 
 **Actual effort:** 1 day
 
@@ -300,6 +303,37 @@ cpu_features_t cfd_get_cpu_features(void);
   - Tested all BC types (Neumann, Dirichlet, no-slip)
   - Verified backend detection (OMP available, SIMD detected)
   - All tests pass
+
+**Actual effort:** 1 day
+
+### Phase 2.5: CI/Build System for v0.1.6 (Critical) ✅ COMPLETED
+
+**Priority:** P0 - Required for v0.1.6 compatibility
+
+**Status:** Completed on 2025-12-29
+
+**Tasks:**
+
+- [x] **2.5.1 Implement dual-variant wheel builds**
+  - Matrix build strategy for CPU-only and CUDA-enabled wheels
+  - CPU wheels: Linux, macOS, Windows (Scalar + SIMD + OpenMP backends)
+  - CUDA wheels: Linux, Windows (All CPU backends + CUDA, Turing+ GPUs)
+  - Artifact naming: `wheel-{os}-{variant}` for differentiation
+
+- [x] **2.5.2 Fix CMakeLists.txt for modular libraries**
+  - Link all modular CFD libraries individually
+  - GNU linker groups on Linux for circular dependencies
+  - Automatic CUDA library detection
+
+- [x] **2.5.3 Update CI test infrastructure**
+  - Install CUDA runtime (12.0.0) for CUDA wheel tests
+  - Use standard `pip` instead of `uv` for stable ABI wheel installation
+  - Test matrix: Python 3.9 and 3.13 on all platforms
+
+- [x] **2.5.4 Ensure PEP 427 compliance**
+  - Standard wheel filenames (no variant suffixes)
+  - Variant differentiation through artifact names only
+  - PyPI-compatible wheel naming
 
 **Actual effort:** 1 day
 
@@ -502,13 +536,14 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 |-------|----------|------------|
 | Phase 1: Breaking Changes | ~~2-3 days~~ ✅ 1 day | ~~2-3 days~~ 1 day |
 | Phase 2: Boundary Conditions | ~~3-4 days~~ ✅ 1 day | ~~5-7 days~~ 2 days |
-| Phase 3: Derived Fields | 1-2 days | 3-4 days |
-| Phase 4: Error Handling | 1 day | 4-5 days |
-| Phase 5: Backend Availability (v0.1.6) | 1 day | 5-6 days |
-| Phase 6: CPU Features | 1 day | 6-7 days |
-| Phase 7: Docs & Tests | 2 days | 8-9 days |
+| Phase 2.5: CI/Build System (v0.1.6) | ✅ 1 day | 3 days |
+| Phase 3: Derived Fields | 1-2 days | 4-5 days |
+| Phase 4: Error Handling | 1 day | 5-6 days |
+| Phase 5: Backend Availability (v0.1.6) | 1 day | 6-7 days |
+| Phase 6: CPU Features | 1 day | 7-8 days |
+| Phase 7: Docs & Tests | 2 days | 9-10 days |
 
-**Total estimated effort:** 8-9 days (2 days completed)
+**Total estimated effort:** 9-10 days (3 days completed)
 
 ---
 
