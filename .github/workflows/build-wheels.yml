@@ -99,8 +99,6 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.0.0'
-          method: 'network'
-          sub-packages: '["nvcc", "cudart"]'
 
       - name: Build CFD library (Linux with CUDA)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
@@ -122,8 +120,6 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.0.0'
-          method: 'network'
-          sub-packages: '["nvcc", "cudart", "visual_studio_integration"]'
 
       - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
@@ -213,16 +209,12 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.0.0'
-          method: 'network'
-          sub-packages: '["cudart"]'  # Only runtime, not nvcc
 
       - name: Install CUDA Toolkit (Windows - for testing)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.0.0'
-          method: 'network'
-          sub-packages: '["cudart"]'
 
       - uses: actions/download-artifact@v4
         with:
