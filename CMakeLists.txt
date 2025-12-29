@@ -39,17 +39,45 @@ set(CFD_LIBRARY_DIRS
     "${CFD_ROOT_DIR}/build/lib"
 )
 
-find_library(CFD_LIBRARY
-    NAMES cfd_library cfd_library_static
+# For static builds (v0.1.6+), CFD library uses modular backend libraries
+# We need to find and link all of them
+set(CFD_LIBRARIES "")
+set(CFD_MODULAR_LIBS cfd_api cfd_core cfd_scalar cfd_simd cfd_omp)
+
+# Check if CUDA library exists (optional)
+find_library(CFD_CUDA_LIB
+    NAMES cfd_cuda
     PATHS ${CFD_LIBRARY_DIRS}
     NO_DEFAULT_PATH
 )
-
-if(NOT CFD_LIBRARY)
-    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIRS}")
+if(CFD_CUDA_LIB)
+    list(APPEND CFD_MODULAR_LIBS cfd_cuda)
+    message(STATUS "Found CFD CUDA library: ${CFD_CUDA_LIB}")
 endif()
 
-message(STATUS "Found CFD library: ${CFD_LIBRARY}")
+# Try to find each modular library
+foreach(lib_name ${CFD_MODULAR_LIBS})
+    find_library(CFD_${lib_name}_LIB
+        NAMES ${lib_name}
+        PATHS ${CFD_LIBRARY_DIRS}
+        NO_DEFAULT_PATH
+    )
+    if(CFD_${lib_name}_LIB)
+        list(APPEND CFD_LIBRARIES ${CFD_${lib_name}_LIB})
+        message(STATUS "Found ${lib_name}: ${CFD_${lib_name}_LIB}")
+    else()
+        message(FATAL_ERROR "${lib_name} not found in ${CFD_LIBRARY_DIRS}")
+    endif()
+endforeach()
+
+# On Linux, wrap in linker groups due to circular dependencies
+# (cfd_scalar/cfd_simd call poisson_solve from cfd_api)
+if(UNIX AND NOT APPLE)
+    set(CFD_LIBRARIES "-Wl,--start-group" ${CFD_LIBRARIES} "-Wl,--end-group")
+    message(STATUS "Using linker groups for CFD libraries (Linux)")
+endif()
+
+message(STATUS "CFD libraries: ${CFD_LIBRARIES}")
 message(STATUS "CFD include dir: ${CFD_INCLUDE_DIR}")
 
 # Find OpenMP - the CFD library uses OpenMP for parallel backends
@@ -128,7 +156,7 @@ target_include_directories(cfd_python PRIVATE
 )
 
 target_link_libraries(cfd_python PRIVATE
-    ${CFD_LIBRARY}
+    ${CFD_LIBRARIES}
 )
 
 # Link OpenMP if available (required for CFD library's parallel backends)
