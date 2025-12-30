@@ -38,7 +38,7 @@ CFD library v0.1.6 introduces **Modular Backend Libraries** - a major architectu
 
 All type names have been changed to follow C naming conventions:
 
-| Old (cfd-python) | New (CFD v0.1.5) |
+| Old (cfd-python) | New (CFD v0.1.6) |
 |------------------|------------------|
 | `FlowField` | `flow_field` |
 | `Grid` | `grid` |
@@ -110,7 +110,7 @@ OUTPUT_VELOCITY_MAGNITUDE
 
 ### 6. New Solver Types
 
-New solvers added in v0.1.5:
+New solvers added in v0.1.5+ (inherited by v0.1.6):
 
 - `"explicit_euler_omp"` - OpenMP parallel explicit Euler
 - `"projection_omp"` - OpenMP parallel projection
@@ -257,12 +257,12 @@ cpu_features_t cfd_get_cpu_features(void);
   - Replaced `OUTPUT_PRESSURE` with `OUTPUT_VELOCITY_MAGNITUDE`
 
 - [x] **1.7 Update CMakeLists.txt**
-  - Added CFD library version check (require >= 0.1.5)
+  - Added CFD library version check (require >= 0.1.6)
   - Added `CFD_BUILD_INCLUDE_DIR` for generated export header
   - Find CFD library headers in correct paths
-  - **v0.1.6 update:** Link modular backend libraries (cfd_api, cfd_core, cfd_scalar, cfd_simd, cfd_omp, cfd_cuda)
-  - **v0.1.6 update:** Added GNU linker groups on Linux for circular dependency resolution
-  - **v0.1.6 update:** Automatic CUDA library detection for optional GPU support
+  - Link modular backend libraries (cfd_api, cfd_core, cfd_scalar, cfd_simd, cfd_omp, cfd_cuda)
+  - Added GNU linker groups on Linux for circular dependency resolution
+  - Automatic CUDA library detection for optional GPU support
 
 **Actual effort:** 1 day
 
