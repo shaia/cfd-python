@@ -107,8 +107,8 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.0.0'
-          method: 'network'
-          linux-local-args: '["--toolkit"]'
+          method: 'local'
+          linux-local-args: '["--toolkit", "--silent", "--override"]'
 
       - name: Build CFD library (Linux with CUDA)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
