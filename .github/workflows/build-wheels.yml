@@ -94,24 +94,21 @@ jobs:
           dir cfd\build\lib\Release
 
       # ============ CUDA builds ============
+      # Using CUDA 12.4 for compatibility with latest compilers:
+      # - Windows: MSVC 14.44 requires CUDA 12.4+
+      # - Linux: GCC 13 requires CUDA 12.4+ (or use GCC 12 with older CUDA)
       - name: Install CUDA Toolkit (Linux)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
         run: |
-          # Install GCC 12 (CUDA 12.0 doesn't support GCC 13+)
-          sudo apt-get update
-          sudo apt-get install -y gcc-12 g++-12
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
-
-          # Install minimal CUDA packages (avoid nsight tools with broken dependencies)
+          # Install minimal CUDA 12.4 packages (avoid nsight tools with broken dependencies)
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
           # Install only compiler and runtime libraries (no profiling tools)
-          sudo apt-get install -y cuda-nvcc-12-0 cuda-cudart-dev-12-0 cuda-nvrtc-dev-12-0 libcublas-dev-12-0 libcusparse-dev-12-0
-          echo "/usr/local/cuda-12.0/bin" >> $GITHUB_PATH
-          echo "CUDA_PATH=/usr/local/cuda-12.0" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          sudo apt-get install -y cuda-nvcc-12-4 cuda-cudart-dev-12-4 cuda-nvrtc-dev-12-4 libcublas-dev-12-4 libcusparse-dev-12-4
+          echo "/usr/local/cuda-12.4/bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=/usr/local/cuda-12.4" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Build CFD library (Linux with CUDA)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
@@ -132,7 +129,7 @@ jobs:
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
-          cuda: '12.0.0'
+          cuda: '12.4.0'
 
       - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
@@ -216,18 +213,18 @@ jobs:
           enable-cache: true
           cache-dependency-glob: ""
 
-      # Install CUDA runtime for CUDA wheel tests
+      # Install CUDA runtime for CUDA wheel tests (must match build version)
       - name: Install CUDA Toolkit (Linux - for testing)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
-          cuda: '12.0.0'
+          cuda: '12.4.0'
 
       - name: Install CUDA Toolkit (Windows - for testing)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
-          cuda: '12.0.0'
+          cuda: '12.4.0'
 
       - uses: actions/download-artifact@v4
         with:
