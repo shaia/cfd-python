@@ -210,8 +210,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
-          enable-cache: true
-          cache-dependency-glob: ""
+          enable-cache: false
 
       # Install CUDA runtime for CUDA wheel tests (must match build version)
       - name: Install CUDA Toolkit (Linux - for testing)
