@@ -215,9 +215,13 @@ jobs:
       # Install CUDA runtime for CUDA wheel tests (must match build version)
       - name: Install CUDA Toolkit (Linux - for testing)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with:
-          cuda: '12.4.0'
+        run: |
+          # Install CUDA runtime libraries via apt (more reliable than runfile installer)
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y cuda-cudart-12-4
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Install CUDA Toolkit (Windows - for testing)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
