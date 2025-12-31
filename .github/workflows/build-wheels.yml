@@ -97,6 +97,12 @@ jobs:
       - name: Install CUDA Toolkit (Linux)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
         run: |
+          # Install GCC 12 (CUDA 12.0 doesn't support GCC 13+)
+          sudo apt-get update
+          sudo apt-get install -y gcc-12 g++-12
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+
           # Install minimal CUDA packages (avoid nsight tools with broken dependencies)
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
