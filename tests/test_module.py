@@ -27,7 +27,7 @@ class TestModuleAttributes:
 
     def test_output_constants_exist(self):
         """Test OUTPUT_* constants are defined"""
-        assert hasattr(cfd_python, "OUTPUT_PRESSURE")
+        assert hasattr(cfd_python, "OUTPUT_VELOCITY_MAGNITUDE")
         assert hasattr(cfd_python, "OUTPUT_VELOCITY")
         assert hasattr(cfd_python, "OUTPUT_FULL_FIELD")
         assert hasattr(cfd_python, "OUTPUT_CSV_TIMESERIES")
@@ -37,7 +37,7 @@ class TestModuleAttributes:
     def test_output_constants_are_integers(self):
         """Test OUTPUT_* constants are integers"""
         output_constants = [
-            "OUTPUT_PRESSURE",
+            "OUTPUT_VELOCITY_MAGNITUDE",
             "OUTPUT_VELOCITY",
             "OUTPUT_FULL_FIELD",
             "OUTPUT_CSV_TIMESERIES",
@@ -53,7 +53,7 @@ class TestModuleAttributes:
     def test_output_constants_unique(self):
         """Test OUTPUT_* constants have unique values"""
         output_constants = [
-            "OUTPUT_PRESSURE",
+            "OUTPUT_VELOCITY_MAGNITUDE",
             "OUTPUT_VELOCITY",
             "OUTPUT_FULL_FIELD",
             "OUTPUT_CSV_TIMESERIES",
@@ -92,7 +92,7 @@ class TestAllExports:
     def test_output_constants_in_all(self):
         """Test OUTPUT_* constants are exported"""
         output_constants = [
-            "OUTPUT_PRESSURE",
+            "OUTPUT_VELOCITY_MAGNITUDE",
             "OUTPUT_VELOCITY",
             "OUTPUT_FULL_FIELD",
             "OUTPUT_CSV_TIMESERIES",

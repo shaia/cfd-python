@@ -31,24 +31,62 @@ else()
 endif()
 message(STATUS "CFD_ROOT_DIR: ${CFD_ROOT_DIR}")
 
+# Source headers in lib/include, generated headers (cfd_export.h) in build/lib/include
 set(CFD_INCLUDE_DIR "${CFD_ROOT_DIR}/lib/include")
+set(CFD_BUILD_INCLUDE_DIR "${CFD_ROOT_DIR}/build/lib/include")
 set(CFD_LIBRARY_DIRS
     "${CFD_ROOT_DIR}/build/lib/Release"
     "${CFD_ROOT_DIR}/build/lib"
 )
 
-find_library(CFD_LIBRARY
-    NAMES cfd_library cfd_library_static
+# For static builds (v0.1.6+), CFD library uses modular backend libraries
+# We need to find and link all of them
+set(CFD_LIBRARIES "")
+set(CFD_MODULAR_LIBS cfd_api cfd_core cfd_scalar cfd_simd cfd_omp)
+
+# Check if CUDA library exists (optional)
+find_library(CFD_CUDA_LIB
+    NAMES cfd_cuda
     PATHS ${CFD_LIBRARY_DIRS}
     NO_DEFAULT_PATH
 )
-
-if(NOT CFD_LIBRARY)
-    message(FATAL_ERROR "CFD library not found in ${CFD_LIBRARY_DIRS}")
+if(CFD_CUDA_LIB)
+    list(APPEND CFD_MODULAR_LIBS cfd_cuda)
+    message(STATUS "Found CFD CUDA library: ${CFD_CUDA_LIB}")
 endif()
 
-message(STATUS "Found CFD library: ${CFD_LIBRARY}")
+# Try to find each modular library
+foreach(lib_name ${CFD_MODULAR_LIBS})
+    find_library(CFD_${lib_name}_LIB
+        NAMES ${lib_name}
+        PATHS ${CFD_LIBRARY_DIRS}
+        NO_DEFAULT_PATH
+    )
+    if(CFD_${lib_name}_LIB)
+        list(APPEND CFD_LIBRARIES ${CFD_${lib_name}_LIB})
+        message(STATUS "Found ${lib_name}: ${CFD_${lib_name}_LIB}")
+    else()
+        message(FATAL_ERROR "${lib_name} not found in ${CFD_LIBRARY_DIRS}")
+    endif()
+endforeach()
+
+# On Linux, wrap in linker groups due to circular dependencies
+# (cfd_scalar/cfd_simd call poisson_solve from cfd_api)
+if(UNIX AND NOT APPLE)
+    set(CFD_LIBRARIES "-Wl,--start-group" ${CFD_LIBRARIES} "-Wl,--end-group")
+    message(STATUS "Using linker groups for CFD libraries (Linux)")
+endif()
+
+message(STATUS "CFD libraries: ${CFD_LIBRARIES}")
 message(STATUS "CFD include dir: ${CFD_INCLUDE_DIR}")
+
+# Find OpenMP - the CFD library uses OpenMP for parallel backends
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    message(STATUS "OpenMP found: ${OpenMP_C_FLAGS}")
+else()
+    message(STATUS "OpenMP not found - parallel backends will not be available")
+endif()
 
 # Create the Python extension module
 # For stable ABI on Windows, we need to manually create the library
@@ -113,12 +151,39 @@ endif()
 
 target_include_directories(cfd_python PRIVATE
     ${CFD_INCLUDE_DIR}
+    ${CFD_BUILD_INCLUDE_DIR}
     ${Python_INCLUDE_DIRS}
 )
 
 target_link_libraries(cfd_python PRIVATE
-    ${CFD_LIBRARY}
+    ${CFD_LIBRARIES}
 )
+
+# Link OpenMP if available (required for CFD library's parallel backends)
+if(OpenMP_C_FOUND)
+    target_link_libraries(cfd_python PRIVATE OpenMP::OpenMP_C)
+endif()
+
+# Link CUDA runtime if the CFD library was built with CUDA support
+# Check if cudart library exists in the CFD build directory
+find_library(CUDART_LIBRARY
+    NAMES cudart cudart_static
+    PATHS ${CFD_LIBRARY_DIRS}
+    NO_DEFAULT_PATH
+)
+if(CUDART_LIBRARY)
+    message(STATUS "Found CUDA runtime in CFD build: ${CUDART_LIBRARY}")
+    target_link_libraries(cfd_python PRIVATE ${CUDART_LIBRARY})
+else()
+    # Try system CUDA if available
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        message(STATUS "Found system CUDA toolkit, linking cudart")
+        target_link_libraries(cfd_python PRIVATE CUDA::cudart)
+    else()
+        message(STATUS "CUDA not found - GPU solvers will not be available")
+    endif()
+endif()
 
 # Install the extension module
 install(TARGETS cfd_python DESTINATION cfd_python)
