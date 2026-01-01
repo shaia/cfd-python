@@ -49,6 +49,18 @@ Boundary conditions:
         - BC_BACKEND_CUDA: GPU acceleration
 
     Functions:
+        - bc_get_backend(): Get current BC backend
+        - bc_get_backend_name(): Get current BC backend name
+        - bc_set_backend(backend): Set BC backend
+        - bc_backend_available(backend): Check if BC backend is available
+        - bc_apply_scalar(field, nx, ny, bc_type): Apply BC to scalar field
+        - bc_apply_velocity(u, v, nx, ny, bc_type): Apply BC to velocity
+        - bc_apply_dirichlet(field, nx, ny, left, right, bottom, top): Fixed values
+        - bc_apply_noslip(u, v, nx, ny): Zero velocity at walls
+        - bc_apply_inlet_uniform(u, v, nx, ny, u_inlet, v_inlet, edge): Uniform inlet
+        - bc_apply_inlet_parabolic(u, v, nx, ny, max_velocity, edge): Parabolic inlet
+        - bc_apply_outlet_scalar(field, nx, ny, edge): Zero-gradient outlet
+        - bc_apply_outlet_velocity(u, v, nx, ny, edge): Zero-gradient outlet
 
 Solver backend availability (v0.1.6):
     Backends:
@@ -62,16 +74,6 @@ Solver backend availability (v0.1.6):
         - backend_get_name(backend): Get backend name string
         - list_solvers_by_backend(backend): Get solvers for a backend
         - get_available_backends(): Get list of all available backends
-
-Boundary condition functions:
-        - bc_apply_scalar(field, nx, ny, bc_type): Apply BC to scalar field
-        - bc_apply_velocity(u, v, nx, ny, bc_type): Apply BC to velocity
-        - bc_apply_dirichlet(field, nx, ny, left, right, bottom, top): Fixed values
-        - bc_apply_noslip(u, v, nx, ny): Zero velocity at walls
-        - bc_apply_inlet_uniform(u, v, nx, ny, u_inlet, v_inlet, edge): Uniform inlet
-        - bc_apply_inlet_parabolic(u, v, nx, ny, max_velocity, edge): Parabolic inlet
-        - bc_apply_outlet_scalar(field, nx, ny, edge): Zero-gradient outlet
-        - bc_apply_outlet_velocity(u, v, nx, ny, edge): Zero-gradient outlet
 """
 
 from ._version import get_version
