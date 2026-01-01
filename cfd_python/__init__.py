@@ -1,4 +1,4 @@
-"""CFD Python - Python bindings for CFD simulation library v0.1.5+.
+"""CFD Python - Python bindings for CFD simulation library v0.1.6+.
 
 This package provides Python bindings for the C-based CFD simulation library,
 enabling high-performance computational fluid dynamics simulations from Python.
@@ -49,6 +49,10 @@ Boundary conditions:
         - BC_BACKEND_CUDA: GPU acceleration
 
     Functions:
+        - bc_get_backend(): Get current BC backend
+        - bc_get_backend_name(): Get current BC backend name
+        - bc_set_backend(backend): Set BC backend
+        - bc_backend_available(backend): Check if BC backend is available
         - bc_apply_scalar(field, nx, ny, bc_type): Apply BC to scalar field
         - bc_apply_velocity(u, v, nx, ny, bc_type): Apply BC to velocity
         - bc_apply_dirichlet(field, nx, ny, left, right, bottom, top): Fixed values
@@ -62,6 +66,19 @@ Derived fields and statistics:
     - calculate_field_stats(data): Compute min, max, avg, sum for a field
     - compute_velocity_magnitude(u, v, nx, ny): Compute sqrt(u^2 + v^2)
     - compute_flow_statistics(u, v, p, nx, ny): Statistics for all flow components
+
+Solver backend availability (v0.1.6):
+    Backends:
+        - BACKEND_SCALAR: Basic scalar CPU implementation
+        - BACKEND_SIMD: SIMD-optimized (AVX2/SSE)
+        - BACKEND_OMP: OpenMP parallelized
+        - BACKEND_CUDA: CUDA GPU acceleration
+
+    Functions:
+        - backend_is_available(backend): Check if backend is available
+        - backend_get_name(backend): Get backend name string
+        - list_solvers_by_backend(backend): Get solvers for a backend
+        - get_available_backends(): Get list of all available backends
 """
 
 from ._version import get_version
@@ -139,6 +156,16 @@ _CORE_EXPORTS = [
     "calculate_field_stats",
     "compute_velocity_magnitude",
     "compute_flow_statistics",
+    # Solver backend constants (v0.1.6)
+    "BACKEND_SCALAR",
+    "BACKEND_SIMD",
+    "BACKEND_OMP",
+    "BACKEND_CUDA",
+    # Solver backend availability functions (v0.1.6)
+    "backend_is_available",
+    "backend_get_name",
+    "list_solvers_by_backend",
+    "get_available_backends",
 ]
 
 # Load C extension and populate module namespace

@@ -326,9 +326,10 @@ cpu_features_t cfd_get_cpu_features(void);
   - Automatic CUDA library detection
 
 - [x] **2.5.3 Update CI test infrastructure**
-  - Install CUDA runtime (12.0.0) for CUDA wheel tests
+  - Install CUDA runtime (12.4.0) for CUDA wheel tests
   - Use standard `pip` instead of `uv` for stable ABI wheel installation
   - Test matrix: Python 3.9 and 3.13 on all platforms
+  - Use apt-based CUDA installation on Linux (more reliable than runfile)
 
 - [x] **2.5.4 Ensure PEP 427 compliance**
   - Standard wheel filenames (no variant suffixes)
@@ -388,30 +389,33 @@ cpu_features_t cfd_get_cpu_features(void);
 
 **Estimated effort:** 1 day
 
-### Phase 5: Add Backend Availability API (v0.1.6 Feature)
+### Phase 5: Add Backend Availability API (v0.1.6 Feature) ✅ COMPLETED
 
 **Priority:** P1 - Important for v0.1.6 compatibility
 
+**Status:** Completed on 2025-12-31
+
 **Tasks:**
 
-- [ ] **5.1 Expose backend enum**
-  - `BACKEND_SCALAR`, `BACKEND_SIMD`, `BACKEND_OMP`, `BACKEND_CUDA` constants
-  - Map to `ns_solver_backend_t` enum
+- [x] **5.1 Expose backend enum**
+  - Added `BACKEND_SCALAR`, `BACKEND_SIMD`, `BACKEND_OMP`, `BACKEND_CUDA` constants
+  - Map to `ns_solver_backend_t` enum (values 0-3)
 
-- [ ] **5.2 Implement backend availability functions**
+- [x] **5.2 Implement backend availability functions**
   - `backend_is_available(backend)` → bool
   - `backend_get_name(backend)` → string
   - `list_solvers_by_backend(backend)` → list of solver names
 
-- [ ] **5.3 Add solver creation with validation**
-  - `create_solver_checked(name)` → raises exception if backend unavailable
-  - Better error messages for unsupported backends
-
-- [ ] **5.4 Add backend query helpers**
+- [x] **5.3 Add backend query helpers**
   - `get_available_backends()` → list of available backend names
-  - `get_solver_backend(solver_name)` → backend enum
 
-**Estimated effort:** 1 day
+- [x] **5.4 Add tests**
+  - Created `tests/test_backend_availability.py` with comprehensive tests
+  - Tests for constants, availability checking, name queries, solver listing
+
+**Note:** `create_solver_checked()` and `get_solver_backend()` deferred to Phase 4 (error handling integration).
+
+**Actual effort:** 0.5 days
 
 ### Phase 6: Add CPU Features & Misc (Enhancement)
 
@@ -544,11 +548,11 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 | Phase 2.5: CI/Build System (v0.1.6) | ✅ 1 day | 3 days |
 | Phase 3: Derived Fields | ~~1-2 days~~ ✅ < 1 day | 3.5 days |
 | Phase 4: Error Handling | 1 day | 4.5 days |
-| Phase 5: Backend Availability (v0.1.6) | 1 day | 5.5 days |
-| Phase 6: CPU Features | 1 day | 6.5 days |
-| Phase 7: Docs & Tests | 2 days | 8.5 days |
+| Phase 5: Backend Availability (v0.1.6) | ✅ 0.5 days | 4 days |
+| Phase 6: CPU Features | 1 day | 5 days |
+| Phase 7: Docs & Tests | 2 days | 7 days |
 
-**Total estimated effort:** ~~9-10 days~~ ~8.5 days (3.5 days completed)
+**Total estimated effort:** ~~9-10 days~~ ~7 days (4 days completed)
 
 ---
 

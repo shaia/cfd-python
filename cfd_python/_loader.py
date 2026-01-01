@@ -33,6 +33,11 @@ def load_extension():
     try:
         from . import cfd_python as _cfd_module
         from .cfd_python import (
+            BACKEND_CUDA,
+            BACKEND_OMP,
+            # Solver backend constants (v0.1.6)
+            BACKEND_SCALAR,
+            BACKEND_SIMD,
             # Boundary condition backends
             BC_BACKEND_AUTO,
             BC_BACKEND_CUDA,
@@ -66,6 +71,9 @@ def load_extension():
             OUTPUT_FULL_FIELD,
             OUTPUT_VELOCITY,
             OUTPUT_VELOCITY_MAGNITUDE,
+            backend_get_name,
+            # Solver backend availability functions (v0.1.6)
+            backend_is_available,
             bc_apply_dirichlet,
             bc_apply_inlet_parabolic,
             bc_apply_inlet_uniform,
@@ -86,6 +94,7 @@ def load_extension():
             compute_velocity_magnitude,
             # Core functions
             create_grid,
+            get_available_backends,
             get_default_solver_params,
             get_error_string,
             get_last_error,
@@ -93,6 +102,7 @@ def load_extension():
             get_solver_info,
             has_solver,
             list_solvers,
+            list_solvers_by_backend,
             run_simulation,
             run_simulation_with_params,
             set_output_dir,
@@ -172,6 +182,16 @@ def load_extension():
             "calculate_field_stats": calculate_field_stats,
             "compute_velocity_magnitude": compute_velocity_magnitude,
             "compute_flow_statistics": compute_flow_statistics,
+            # Solver backend constants (v0.1.6)
+            "BACKEND_SCALAR": BACKEND_SCALAR,
+            "BACKEND_SIMD": BACKEND_SIMD,
+            "BACKEND_OMP": BACKEND_OMP,
+            "BACKEND_CUDA": BACKEND_CUDA,
+            # Solver backend availability functions (v0.1.6)
+            "backend_is_available": backend_is_available,
+            "backend_get_name": backend_get_name,
+            "list_solvers_by_backend": list_solvers_by_backend,
+            "get_available_backends": get_available_backends,
         }
 
         # Collect dynamic SOLVER_* constants

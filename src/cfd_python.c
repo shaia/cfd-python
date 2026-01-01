@@ -875,6 +875,141 @@ static PyObject* bc_backend_available_py(PyObject* self, PyObject* args) {
 }
 
 /*
+ * ========================================
+ * Solver Backend Availability API (v0.1.6)
+ * ========================================
+ */
+
+/*
+ * Check if a solver backend is available at runtime
+ */
+static PyObject* backend_is_available_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    int available = cfd_backend_is_available((ns_solver_backend_t)backend);
+    return PyBool_FromLong(available);
+}
+
+/*
+ * Get human-readable name for a solver backend
+ */
+static PyObject* backend_get_name_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    const char* name = cfd_backend_get_name((ns_solver_backend_t)backend);
+    if (name == NULL) {
+        Py_RETURN_NONE;
+    }
+    return PyUnicode_FromString(name);
+}
+
+/*
+ * Get list of solvers for a specific backend
+ */
+static PyObject* list_solvers_by_backend_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    if (g_registry == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Solver registry not initialized");
+        return NULL;
+    }
+
+    // First, get the count
+    int count = cfd_registry_list_by_backend(g_registry, (ns_solver_backend_t)backend, NULL, 0);
+    if (count <= 0) {
+        return PyList_New(0);  // Return empty list
+    }
+
+    // Allocate array for names
+    const char** names = (const char**)malloc(count * sizeof(const char*));
+    if (names == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate names array");
+        return NULL;
+    }
+
+    // Get the actual names
+    int actual_count = cfd_registry_list_by_backend(g_registry, (ns_solver_backend_t)backend, names, count);
+
+    // Build Python list
+    PyObject* result = PyList_New(actual_count);
+    if (result == NULL) {
+        free(names);
+        return NULL;
+    }
+
+    for (int i = 0; i < actual_count; i++) {
+        PyObject* name = PyUnicode_FromString(names[i]);
+        if (name == NULL) {
+            Py_DECREF(result);
+            free(names);
+            return NULL;
+        }
+        PyList_SetItem(result, i, name);  // Steals reference
+    }
+
+    free(names);
+    return result;
+}
+
+/*
+ * Get list of all available backends
+ */
+static PyObject* get_available_backends_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    PyObject* result = PyList_New(0);
+    if (result == NULL) {
+        return NULL;
+    }
+
+    // Check each backend
+    ns_solver_backend_t backends[] = {
+        NS_SOLVER_BACKEND_SCALAR,
+        NS_SOLVER_BACKEND_SIMD,
+        NS_SOLVER_BACKEND_OMP,
+        NS_SOLVER_BACKEND_CUDA
+    };
+    int num_backends = sizeof(backends) / sizeof(backends[0]);
+
+    for (int i = 0; i < num_backends; i++) {
+        if (cfd_backend_is_available(backends[i])) {
+            const char* name = cfd_backend_get_name(backends[i]);
+            if (name != NULL) {
+                PyObject* name_obj = PyUnicode_FromString(name);
+                if (name_obj == NULL) {
+                    Py_DECREF(result);
+                    return NULL;
+                }
+                if (PyList_Append(result, name_obj) < 0) {
+                    Py_DECREF(name_obj);
+                    Py_DECREF(result);
+                    return NULL;
+                }
+                Py_DECREF(name_obj);
+            }
+        }
+    }
+
+    return result;
+}
+
+/*
  * Apply boundary conditions to scalar field
  */
 static PyObject* bc_apply_scalar_py(PyObject* self, PyObject* args, PyObject* kwds) {
@@ -1940,6 +2075,29 @@ static PyMethodDef cfd_python_methods[] = {
      "Returns:\n"
      "    dict: Statistics for 'u', 'v', 'p', 'velocity_magnitude'\n"
      "          Each contains 'min', 'max', 'avg', 'sum'"},
+    // Solver Backend Availability API (v0.1.6)
+    {"backend_is_available", backend_is_available_py, METH_VARARGS,
+     "Check if a solver backend is available at runtime.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type (BACKEND_SCALAR, BACKEND_SIMD, etc.)\n\n"
+     "Returns:\n"
+     "    bool: True if backend is available"},
+    {"backend_get_name", backend_get_name_py, METH_VARARGS,
+     "Get human-readable name for a solver backend.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    str or None: Backend name (e.g., 'scalar', 'simd', 'omp', 'cuda')"},
+    {"list_solvers_by_backend", list_solvers_by_backend_py, METH_VARARGS,
+     "Get list of solver types for a specific backend.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    list: Solver type names for the specified backend"},
+    {"get_available_backends", get_available_backends_py, METH_NOARGS,
+     "Get list of all available backends.\n\n"
+     "Returns:\n"
+     "    list: Names of available backends (e.g., ['scalar', 'simd', 'omp'])"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2085,6 +2243,15 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         PyModule_AddIntConstant(m, "BC_BACKEND_OMP", BC_BACKEND_OMP) < 0 ||
         PyModule_AddIntConstant(m, "BC_BACKEND_SIMD", BC_BACKEND_SIMD) < 0 ||
         PyModule_AddIntConstant(m, "BC_BACKEND_CUDA", BC_BACKEND_CUDA) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add solver backend constants (v0.1.6 API)
+    if (PyModule_AddIntConstant(m, "BACKEND_SCALAR", NS_SOLVER_BACKEND_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "BACKEND_SIMD", NS_SOLVER_BACKEND_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "BACKEND_OMP", NS_SOLVER_BACKEND_OMP) < 0 ||
+        PyModule_AddIntConstant(m, "BACKEND_CUDA", NS_SOLVER_BACKEND_CUDA) < 0) {
         Py_DECREF(m);
         return NULL;
     }
