@@ -97,13 +97,13 @@ class TestBackendGetName:
         """Test backend_get_name returns expected name strings"""
         assert cfd_python.backend_get_name(cfd_python.BACKEND_SCALAR) == "scalar"
         assert cfd_python.backend_get_name(cfd_python.BACKEND_SIMD) == "simd"
-        assert cfd_python.backend_get_name(cfd_python.BACKEND_OMP) == "omp"
+        assert cfd_python.backend_get_name(cfd_python.BACKEND_OMP) == "openmp"
         assert cfd_python.backend_get_name(cfd_python.BACKEND_CUDA) == "cuda"
 
     def test_backend_get_name_invalid_backend(self):
-        """Test backend_get_name with invalid backend returns None"""
+        """Test backend_get_name with invalid backend returns 'unknown'"""
         result = cfd_python.backend_get_name(999)
-        assert result is None
+        assert result == "unknown"
 
 
 class TestListSolversByBackend:
@@ -159,7 +159,7 @@ class TestGetAvailableBackends:
         for backend_id, backend_name in [
             (cfd_python.BACKEND_SCALAR, "scalar"),
             (cfd_python.BACKEND_SIMD, "simd"),
-            (cfd_python.BACKEND_OMP, "omp"),
+            (cfd_python.BACKEND_OMP, "openmp"),
             (cfd_python.BACKEND_CUDA, "cuda"),
         ]:
             is_available = cfd_python.backend_is_available(backend_id)
