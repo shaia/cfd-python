@@ -959,7 +959,7 @@ static PyObject* list_solvers_by_backend_py(PyObject* self, PyObject* args) {
             free(names);
             return NULL;
         }
-        PyList_SET_ITEM(result, i, name);  // Steals reference
+        PyList_SetItem(result, i, name);  // Steals reference
     }
 
     free(names);
