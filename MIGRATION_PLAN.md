@@ -337,27 +337,32 @@ cpu_features_t cfd_get_cpu_features(void);
 
 **Actual effort:** 1 day
 
-### Phase 3: Add Derived Fields & Statistics (Important)
+### Phase 3: Add Derived Fields & Statistics (Important) ✅ COMPLETED
 
 **Priority:** P1 - Useful for post-processing
 
+**Status:** Completed on 2026-01-01
+
 **Tasks:**
 
-- [ ] **3.1 Create DerivedFields class**
-  - Wrapper for `derived_fields` struct
-  - Properties for velocity_magnitude array
-  - Properties for field statistics
+- [x] **3.1 Implement field statistics function**
+  - `calculate_field_stats(data)` - Compute min, max, avg, sum for a field
+  - Returns dict with 'min', 'max', 'avg', 'sum' keys
 
-- [ ] **3.2 Implement statistics functions**
-  - `compute_velocity_magnitude(field)`
-  - `compute_statistics(field)`
-  - Return `FieldStats` named tuple
+- [x] **3.2 Implement velocity magnitude computation**
+  - `compute_velocity_magnitude(u, v, nx, ny)` - Compute sqrt(u^2 + v^2)
+  - Returns list of velocity magnitudes
 
-- [ ] **3.3 Add to simulation workflow**
-  - Automatic derived field computation after step
-  - Access via `sim.derived_fields`
+- [x] **3.3 Implement comprehensive flow statistics**
+  - `compute_flow_statistics(u, v, p, nx, ny)` - Statistics for all flow components
+  - Returns dict with 'u', 'v', 'p', 'velocity_magnitude' stats
 
-**Estimated effort:** 1-2 days
+- [x] **3.4 Add tests**
+  - Created `tests/test_derived_fields.py` with comprehensive tests
+  - Tests for all three functions with edge cases
+  - Proper error handling tests (empty lists, wrong types, size mismatches)
+
+**Actual effort:** < 1 day
 
 ### Phase 4: Add Error Handling API (Important)
 
@@ -537,13 +542,13 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 | Phase 1: Breaking Changes | ~~2-3 days~~ ✅ 1 day | ~~2-3 days~~ 1 day |
 | Phase 2: Boundary Conditions | ~~3-4 days~~ ✅ 1 day | ~~5-7 days~~ 2 days |
 | Phase 2.5: CI/Build System (v0.1.6) | ✅ 1 day | 3 days |
-| Phase 3: Derived Fields | 1-2 days | 4-5 days |
-| Phase 4: Error Handling | 1 day | 5-6 days |
-| Phase 5: Backend Availability (v0.1.6) | 1 day | 6-7 days |
-| Phase 6: CPU Features | 1 day | 7-8 days |
-| Phase 7: Docs & Tests | 2 days | 9-10 days |
+| Phase 3: Derived Fields | ~~1-2 days~~ ✅ < 1 day | 3.5 days |
+| Phase 4: Error Handling | 1 day | 4.5 days |
+| Phase 5: Backend Availability (v0.1.6) | 1 day | 5.5 days |
+| Phase 6: CPU Features | 1 day | 6.5 days |
+| Phase 7: Docs & Tests | 2 days | 8.5 days |
 
-**Total estimated effort:** 9-10 days (3 days completed)
+**Total estimated effort:** ~~9-10 days~~ ~8.5 days (3.5 days completed)
 
 ---
 

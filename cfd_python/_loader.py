@@ -79,7 +79,11 @@ def load_extension():
             bc_get_backend,
             bc_get_backend_name,
             bc_set_backend,
+            # Derived fields API (Phase 3)
+            calculate_field_stats,
             clear_error,
+            compute_flow_statistics,
+            compute_velocity_magnitude,
             # Core functions
             create_grid,
             get_default_solver_params,
@@ -164,6 +168,10 @@ def load_extension():
             "bc_apply_inlet_parabolic": bc_apply_inlet_parabolic,
             "bc_apply_outlet_scalar": bc_apply_outlet_scalar,
             "bc_apply_outlet_velocity": bc_apply_outlet_velocity,
+            # Derived fields API (Phase 3)
+            "calculate_field_stats": calculate_field_stats,
+            "compute_velocity_magnitude": compute_velocity_magnitude,
+            "compute_flow_statistics": compute_flow_statistics,
         }
 
         # Collect dynamic SOLVER_* constants
