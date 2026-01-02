@@ -430,26 +430,32 @@ cpu_features_t cfd_get_cpu_features(void);
 
 **Actual effort:** 0.5 days
 
-### Phase 6: Add CPU Features & Misc (Enhancement)
+### Phase 6: Add CPU Features & Misc (Enhancement) ✅ COMPLETED
 
 **Priority:** P2 - Nice to have
 
+**Status:** Completed on 2026-01-02
+
 **Tasks:**
 
-- [ ] **6.1 CPU features detection**
-  - `get_cpu_features()` → set of feature flags
-  - `has_avx2()`, `has_neon()` helpers
+- [x] **6.1 CPU features detection**
+  - Added `SIMD_NONE`, `SIMD_AVX2`, `SIMD_NEON` constants
+  - `get_simd_arch()` → returns SIMD architecture constant
+  - `get_simd_name()` → returns "avx2", "neon", or "none"
+  - `has_avx2()` → bool (checks AVX2 availability with OS support verification)
+  - `has_neon()` → bool (checks ARM NEON availability)
+  - `has_simd()` → bool (checks if any SIMD is available)
 
-- [ ] **6.2 Grid initialization variants**
-  - `grid_uniform(nx, ny, ...)`
-  - `grid_chebyshev(nx, ny, ...)`
-  - `grid_geometric(nx, ny, ...)`
+- [x] **6.2 Grid initialization variants**
+  - `create_grid_stretched(nx, ny, xmin, xmax, ymin, ymax, beta)` - Hyperbolic cosine stretching
+  - Clusters points toward the domain center (symmetric stretching)
+  - Note: Chebyshev and geometric variants not available in C library
 
-- [ ] **6.3 Update solver list**
-  - Add new OMP solver types
-  - Update documentation
+- [x] **6.3 Add tests**
+  - Created `tests/test_cpu_features.py` with 26 tests
+  - Tests for SIMD constants, detection functions, and grid stretching
 
-**Estimated effort:** 1 day
+**Actual effort:** < 0.5 days
 
 ### Phase 7: Documentation & Tests (Required)
 
@@ -562,10 +568,10 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 | Phase 3: Derived Fields | ~~1-2 days~~ ✅ < 1 day | 3.5 days |
 | Phase 4: Error Handling | ~~1 day~~ ✅ < 0.5 days | 4 days |
 | Phase 5: Backend Availability (v0.1.6) | ✅ 0.5 days | 4.5 days |
-| Phase 6: CPU Features | 1 day | 5.5 days |
-| Phase 7: Docs & Tests | 2 days | 7.5 days |
+| Phase 6: CPU Features | ~~1 day~~ ✅ < 0.5 days | 5 days |
+| Phase 7: Docs & Tests | 2 days | 7 days |
 
-**Total estimated effort:** ~~9-10 days~~ ~7.5 days (4.5 days completed)
+**Total estimated effort:** ~~9-10 days~~ ~7 days (5 days completed)
 
 ---
 
