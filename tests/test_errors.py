@@ -5,6 +5,16 @@ Tests for error handling
 import pytest
 
 import cfd_python
+from cfd_python import (
+    CFDDivergedError,
+    CFDError,
+    CFDInvalidError,
+    CFDIOError,
+    CFDMaxIterError,
+    CFDMemoryError,
+    CFDUnsupportedError,
+    raise_for_status,
+)
 
 
 class TestErrorHandling:
@@ -59,3 +69,143 @@ class TestErrorHandling:
         result = cfd_python.run_simulation(5, 5, steps=0)
         assert isinstance(result, list)
         assert len(result) == 25  # 5x5 grid
+
+
+class TestExceptionClasses:
+    """Test exception class hierarchy and attributes"""
+
+    def test_cfd_error_base(self):
+        """Test CFDError base class"""
+        err = CFDError("test error", -1)
+        assert err.message == "test error"
+        assert err.status_code == -1
+        assert "test error" in str(err)
+        assert "(status=-1)" in str(err)
+
+    def test_cfd_error_default_status(self):
+        """Test CFDError with default status code"""
+        err = CFDError("test error")
+        assert err.status_code == -1
+
+    def test_cfd_memory_error_inheritance(self):
+        """Test CFDMemoryError inherits from both CFDError and MemoryError"""
+        err = CFDMemoryError("out of memory", -2)
+        assert isinstance(err, CFDError)
+        assert isinstance(err, MemoryError)
+        assert err.status_code == -2
+
+    def test_cfd_invalid_error_inheritance(self):
+        """Test CFDInvalidError inherits from both CFDError and ValueError"""
+        err = CFDInvalidError("invalid argument", -3)
+        assert isinstance(err, CFDError)
+        assert isinstance(err, ValueError)
+        assert err.status_code == -3
+
+    def test_cfd_io_error_inheritance(self):
+        """Test CFDIOError inherits from both CFDError and IOError"""
+        err = CFDIOError("file not found", -4)
+        assert isinstance(err, CFDError)
+        assert isinstance(err, IOError)
+        assert err.status_code == -4
+
+    def test_cfd_unsupported_error_inheritance(self):
+        """Test CFDUnsupportedError inherits from both CFDError and NotImplementedError"""
+        err = CFDUnsupportedError("not supported", -5)
+        assert isinstance(err, CFDError)
+        assert isinstance(err, NotImplementedError)
+        assert err.status_code == -5
+
+    def test_cfd_diverged_error(self):
+        """Test CFDDivergedError"""
+        err = CFDDivergedError("solver diverged", -6)
+        assert isinstance(err, CFDError)
+        assert err.status_code == -6
+
+    def test_cfd_max_iter_error(self):
+        """Test CFDMaxIterError"""
+        err = CFDMaxIterError("max iterations reached", -7)
+        assert isinstance(err, CFDError)
+        assert err.status_code == -7
+
+
+class TestRaiseForStatus:
+    """Test raise_for_status function"""
+
+    def test_success_does_not_raise(self):
+        """Test that success status codes do not raise"""
+        raise_for_status(0)  # CFD_SUCCESS
+        raise_for_status(1)  # Any positive value
+
+    def test_generic_error_raises_cfd_error(self):
+        """Test that -1 raises CFDError"""
+        with pytest.raises(CFDError) as exc_info:
+            raise_for_status(-1)
+        assert exc_info.value.status_code == -1
+
+    def test_nomem_raises_cfd_memory_error(self):
+        """Test that -2 raises CFDMemoryError"""
+        with pytest.raises(CFDMemoryError) as exc_info:
+            raise_for_status(-2)
+        assert exc_info.value.status_code == -2
+
+    def test_invalid_raises_cfd_invalid_error(self):
+        """Test that -3 raises CFDInvalidError"""
+        with pytest.raises(CFDInvalidError) as exc_info:
+            raise_for_status(-3)
+        assert exc_info.value.status_code == -3
+
+    def test_io_raises_cfd_io_error(self):
+        """Test that -4 raises CFDIOError"""
+        with pytest.raises(CFDIOError) as exc_info:
+            raise_for_status(-4)
+        assert exc_info.value.status_code == -4
+
+    def test_unsupported_raises_cfd_unsupported_error(self):
+        """Test that -5 raises CFDUnsupportedError"""
+        with pytest.raises(CFDUnsupportedError) as exc_info:
+            raise_for_status(-5)
+        assert exc_info.value.status_code == -5
+
+    def test_diverged_raises_cfd_diverged_error(self):
+        """Test that -6 raises CFDDivergedError"""
+        with pytest.raises(CFDDivergedError) as exc_info:
+            raise_for_status(-6)
+        assert exc_info.value.status_code == -6
+
+    def test_max_iter_raises_cfd_max_iter_error(self):
+        """Test that -7 raises CFDMaxIterError"""
+        with pytest.raises(CFDMaxIterError) as exc_info:
+            raise_for_status(-7)
+        assert exc_info.value.status_code == -7
+
+    def test_unknown_error_raises_cfd_error(self):
+        """Test that unknown negative codes raise CFDError"""
+        with pytest.raises(CFDError) as exc_info:
+            raise_for_status(-99)
+        assert exc_info.value.status_code == -99
+
+    def test_context_included_in_message(self):
+        """Test that context is included in error message"""
+        with pytest.raises(CFDError) as exc_info:
+            raise_for_status(-1, "during simulation")
+        assert "during simulation" in str(exc_info.value)
+
+
+class TestExceptionExports:
+    """Test that exception classes are properly exported"""
+
+    def test_exceptions_in_all(self):
+        """Test all exception classes are in __all__"""
+        exceptions = [
+            "CFDError",
+            "CFDMemoryError",
+            "CFDInvalidError",
+            "CFDIOError",
+            "CFDUnsupportedError",
+            "CFDDivergedError",
+            "CFDMaxIterError",
+            "raise_for_status",
+        ]
+        for name in exceptions:
+            assert name in cfd_python.__all__, f"{name} should be in __all__"
+            assert hasattr(cfd_python, name), f"{name} should be accessible"
