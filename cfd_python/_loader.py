@@ -35,17 +35,14 @@ def load_extension():
         from .cfd_python import (
             BACKEND_CUDA,
             BACKEND_OMP,
-            # Solver backend constants (v0.1.6)
             BACKEND_SCALAR,
             BACKEND_SIMD,
-            # Boundary condition backends
             BC_BACKEND_AUTO,
             BC_BACKEND_CUDA,
             BC_BACKEND_OMP,
             BC_BACKEND_SCALAR,
             BC_BACKEND_SIMD,
             BC_EDGE_BOTTOM,
-            # Boundary edges
             BC_EDGE_LEFT,
             BC_EDGE_RIGHT,
             BC_EDGE_TOP,
@@ -54,7 +51,6 @@ def load_extension():
             BC_TYPE_NEUMANN,
             BC_TYPE_NOSLIP,
             BC_TYPE_OUTLET,
-            # Boundary condition types
             BC_TYPE_PERIODIC,
             CFD_ERROR,
             CFD_ERROR_DIVERGED,
@@ -63,7 +59,6 @@ def load_extension():
             CFD_ERROR_MAX_ITER,
             CFD_ERROR_NOMEM,
             CFD_ERROR_UNSUPPORTED,
-            # Error handling API
             CFD_SUCCESS,
             OUTPUT_CSV_CENTERLINE,
             OUTPUT_CSV_STATISTICS,
@@ -72,7 +67,6 @@ def load_extension():
             OUTPUT_VELOCITY,
             OUTPUT_VELOCITY_MAGNITUDE,
             backend_get_name,
-            # Solver backend availability functions (v0.1.6)
             backend_is_available,
             bc_apply_dirichlet,
             bc_apply_inlet_parabolic,
@@ -83,16 +77,13 @@ def load_extension():
             bc_apply_scalar,
             bc_apply_velocity,
             bc_backend_available,
-            # Boundary condition functions
             bc_get_backend,
             bc_get_backend_name,
             bc_set_backend,
-            # Derived fields API (Phase 3)
             calculate_field_stats,
             clear_error,
             compute_flow_statistics,
             compute_velocity_magnitude,
-            # Core functions
             create_grid,
             get_available_backends,
             get_default_solver_params,
