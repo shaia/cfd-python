@@ -1815,7 +1815,7 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    // Helper macro to add stats dict
+    // Helper macro to add stats dict (properly handles reference counts)
     #define ADD_STATS(name, stats_struct) do { \
         PyObject* stats_dict = PyDict_New(); \
         if (stats_dict == NULL) { \
@@ -1824,10 +1824,29 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
             flow_field_destroy(field); \
             return NULL; \
         } \
-        PyDict_SetItemString(stats_dict, "min", PyFloat_FromDouble((stats_struct).min_val)); \
-        PyDict_SetItemString(stats_dict, "max", PyFloat_FromDouble((stats_struct).max_val)); \
-        PyDict_SetItemString(stats_dict, "avg", PyFloat_FromDouble((stats_struct).avg_val)); \
-        PyDict_SetItemString(stats_dict, "sum", PyFloat_FromDouble((stats_struct).sum_val)); \
+        PyObject* tmp_min = PyFloat_FromDouble((stats_struct).min_val); \
+        PyObject* tmp_max = PyFloat_FromDouble((stats_struct).max_val); \
+        PyObject* tmp_avg = PyFloat_FromDouble((stats_struct).avg_val); \
+        PyObject* tmp_sum = PyFloat_FromDouble((stats_struct).sum_val); \
+        if (tmp_min == NULL || tmp_max == NULL || tmp_avg == NULL || tmp_sum == NULL) { \
+            Py_XDECREF(tmp_min); \
+            Py_XDECREF(tmp_max); \
+            Py_XDECREF(tmp_avg); \
+            Py_XDECREF(tmp_sum); \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
+        PyDict_SetItemString(stats_dict, "min", tmp_min); \
+        PyDict_SetItemString(stats_dict, "max", tmp_max); \
+        PyDict_SetItemString(stats_dict, "avg", tmp_avg); \
+        PyDict_SetItemString(stats_dict, "sum", tmp_sum); \
+        Py_DECREF(tmp_min); \
+        Py_DECREF(tmp_max); \
+        Py_DECREF(tmp_avg); \
+        Py_DECREF(tmp_sum); \
         PyDict_SetItemString(result, name, stats_dict); \
         Py_DECREF(stats_dict); \
     } while(0)
