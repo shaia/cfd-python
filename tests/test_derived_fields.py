@@ -4,6 +4,8 @@ Tests for derived fields and statistics API in cfd_python.
 
 import math
 
+import pytest
+
 import cfd_python
 
 
@@ -59,15 +61,11 @@ class TestCalculateFieldStats:
 
     def test_calculate_field_stats_empty_raises(self):
         """Test that empty list raises ValueError"""
-        import pytest
-
         with pytest.raises(ValueError):
             cfd_python.calculate_field_stats([])
 
     def test_calculate_field_stats_wrong_type_raises(self):
         """Test that non-list raises TypeError"""
-        import pytest
-
         with pytest.raises(TypeError):
             cfd_python.calculate_field_stats("not a list")
 
@@ -120,8 +118,6 @@ class TestComputeVelocityMagnitude:
 
     def test_compute_velocity_magnitude_size_mismatch_raises(self):
         """Test that mismatched sizes raise ValueError"""
-        import pytest
-
         nx, ny = 4, 4
         u = [1.0] * 16
         v = [1.0] * 8  # Wrong size
@@ -131,8 +127,6 @@ class TestComputeVelocityMagnitude:
 
     def test_compute_velocity_magnitude_wrong_type_raises(self):
         """Test that non-list raises TypeError"""
-        import pytest
-
         with pytest.raises(TypeError):
             cfd_python.compute_velocity_magnitude("not list", [1.0], 1, 1)
 
@@ -191,8 +185,6 @@ class TestComputeFlowStatistics:
 
     def test_compute_flow_statistics_size_mismatch_raises(self):
         """Test that mismatched sizes raise ValueError"""
-        import pytest
-
         nx, ny = 4, 4
         u = [1.0] * 16
         v = [1.0] * 16
@@ -203,8 +195,6 @@ class TestComputeFlowStatistics:
 
     def test_compute_flow_statistics_wrong_type_raises(self):
         """Test that non-list raises TypeError"""
-        import pytest
-
         with pytest.raises(TypeError):
             cfd_python.compute_flow_statistics([1.0], "not list", [1.0], 1, 1)
 
