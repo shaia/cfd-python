@@ -1657,10 +1657,17 @@ static PyObject* calculate_field_stats_py(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    PyDict_SetItemString(result, "min", min_val);
-    PyDict_SetItemString(result, "max", max_val);
-    PyDict_SetItemString(result, "avg", avg_val);
-    PyDict_SetItemString(result, "sum", sum_val);
+    if (PyDict_SetItemString(result, "min", min_val) < 0 ||
+        PyDict_SetItemString(result, "max", max_val) < 0 ||
+        PyDict_SetItemString(result, "avg", avg_val) < 0 ||
+        PyDict_SetItemString(result, "sum", sum_val) < 0) {
+        Py_DECREF(min_val);
+        Py_DECREF(max_val);
+        Py_DECREF(avg_val);
+        Py_DECREF(sum_val);
+        Py_DECREF(result);
+        return NULL;
+    }
 
     Py_DECREF(min_val);
     Py_DECREF(max_val);
@@ -1815,7 +1822,7 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    // Helper macro to add stats dict (properly handles reference counts)
+    // Helper macro to add stats dict (properly handles reference counts and errors)
     #define ADD_STATS(name, stats_struct) do { \
         PyObject* stats_dict = PyDict_New(); \
         if (stats_dict == NULL) { \
@@ -1839,15 +1846,31 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
             flow_field_destroy(field); \
             return NULL; \
         } \
-        PyDict_SetItemString(stats_dict, "min", tmp_min); \
-        PyDict_SetItemString(stats_dict, "max", tmp_max); \
-        PyDict_SetItemString(stats_dict, "avg", tmp_avg); \
-        PyDict_SetItemString(stats_dict, "sum", tmp_sum); \
+        if (PyDict_SetItemString(stats_dict, "min", tmp_min) < 0 || \
+            PyDict_SetItemString(stats_dict, "max", tmp_max) < 0 || \
+            PyDict_SetItemString(stats_dict, "avg", tmp_avg) < 0 || \
+            PyDict_SetItemString(stats_dict, "sum", tmp_sum) < 0) { \
+            Py_DECREF(tmp_min); \
+            Py_DECREF(tmp_max); \
+            Py_DECREF(tmp_avg); \
+            Py_DECREF(tmp_sum); \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
         Py_DECREF(tmp_min); \
         Py_DECREF(tmp_max); \
         Py_DECREF(tmp_avg); \
         Py_DECREF(tmp_sum); \
-        PyDict_SetItemString(result, name, stats_dict); \
+        if (PyDict_SetItemString(result, name, stats_dict) < 0) { \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
         Py_DECREF(stats_dict); \
     } while(0)
 
