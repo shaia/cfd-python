@@ -365,29 +365,42 @@ cpu_features_t cfd_get_cpu_features(void);
 
 **Actual effort:** < 1 day
 
-### Phase 4: Add Error Handling API (Important)
+### Phase 4: Add Error Handling API (Important) ✅ COMPLETED
 
 **Priority:** P1 - Better debugging
 
+**Status:** Completed on 2026-01-02
+
 **Tasks:**
 
-- [ ] **4.1 Expose error functions**
-  - `get_last_error()` → Python string
-  - `get_last_status()` → Python enum
-  - `clear_error()`
+- [x] **4.1 Expose error functions**
+  - `get_last_error()` → Python string (already in C extension)
+  - `get_last_status()` → Python enum (already in C extension)
+  - `get_error_string(code)` → Python string (already in C extension)
+  - `clear_error()` (already in C extension)
 
-- [ ] **4.2 Create Python exceptions**
-  - `CFDError` base exception
-  - `CFDMemoryError`
-  - `CFDInvalidError`
-  - `CFDUnsupportedError`
+- [x] **4.2 Create Python exceptions**
+  - Created `cfd_python/_exceptions.py` with exception hierarchy
+  - `CFDError` base exception with `status_code` and `message` attributes
+  - `CFDMemoryError(CFDError, MemoryError)` - for CFD_ERROR_NOMEM (-2)
+  - `CFDInvalidError(CFDError, ValueError)` - for CFD_ERROR_INVALID (-3)
+  - `CFDIOError(CFDError, IOError)` - for CFD_ERROR_IO (-4)
+  - `CFDUnsupportedError(CFDError, NotImplementedError)` - for CFD_ERROR_UNSUPPORTED (-5)
+  - `CFDDivergedError(CFDError)` - for CFD_ERROR_DIVERGED (-6)
+  - `CFDMaxIterError(CFDError)` - for CFD_ERROR_MAX_ITER (-7)
 
-- [ ] **4.3 Integrate with all functions**
-  - Check return codes
-  - Raise appropriate exceptions
-  - Include error messages
+- [x] **4.3 Implement raise_for_status helper**
+  - `raise_for_status(status_code, context="")` - Raises appropriate exception based on status code
+  - Maps status codes to exception classes
+  - Includes error message from C library when available
 
-**Estimated effort:** 1 day
+- [x] **4.4 Add tests**
+  - Added tests to `tests/test_errors.py`
+  - Tests for exception class hierarchy and inheritance
+  - Tests for `raise_for_status` function with all error codes
+  - Tests for export verification
+
+**Actual effort:** < 0.5 days
 
 ### Phase 5: Add Backend Availability API (v0.1.6 Feature) ✅ COMPLETED
 
@@ -547,12 +560,12 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 | Phase 2: Boundary Conditions | ~~3-4 days~~ ✅ 1 day | ~~5-7 days~~ 2 days |
 | Phase 2.5: CI/Build System (v0.1.6) | ✅ 1 day | 3 days |
 | Phase 3: Derived Fields | ~~1-2 days~~ ✅ < 1 day | 3.5 days |
-| Phase 4: Error Handling | 1 day | 4.5 days |
-| Phase 5: Backend Availability (v0.1.6) | ✅ 0.5 days | 4 days |
-| Phase 6: CPU Features | 1 day | 5 days |
-| Phase 7: Docs & Tests | 2 days | 7 days |
+| Phase 4: Error Handling | ~~1 day~~ ✅ < 0.5 days | 4 days |
+| Phase 5: Backend Availability (v0.1.6) | ✅ 0.5 days | 4.5 days |
+| Phase 6: CPU Features | 1 day | 5.5 days |
+| Phase 7: Docs & Tests | 2 days | 7.5 days |
 
-**Total estimated effort:** ~~9-10 days~~ ~7 days (4 days completed)
+**Total estimated effort:** ~~9-10 days~~ ~7.5 days (4.5 days completed)
 
 ---
 

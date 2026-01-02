@@ -81,6 +81,16 @@ Solver backend availability (v0.1.6):
         - get_available_backends(): Get list of all available backends
 """
 
+from ._exceptions import (
+    CFDDivergedError,
+    CFDError,
+    CFDInvalidError,
+    CFDIOError,
+    CFDMaxIterError,
+    CFDMemoryError,
+    CFDUnsupportedError,
+    raise_for_status,
+)
 from ._version import get_version
 
 __version__ = get_version()
@@ -166,6 +176,15 @@ _CORE_EXPORTS = [
     "backend_get_name",
     "list_solvers_by_backend",
     "get_available_backends",
+    # Exception classes (Phase 4)
+    "CFDError",
+    "CFDMemoryError",
+    "CFDInvalidError",
+    "CFDIOError",
+    "CFDUnsupportedError",
+    "CFDDivergedError",
+    "CFDMaxIterError",
+    "raise_for_status",
 ]
 
 # Load C extension and populate module namespace
