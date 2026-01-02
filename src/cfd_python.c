@@ -960,7 +960,12 @@ static PyObject* list_solvers_by_backend_py(PyObject* self, PyObject* args) {
             free(names);
             return NULL;
         }
-        PyList_SetItem(result, i, name);  // Steals reference
+        if (PyList_SetItem(result, i, name) < 0) {  // Steals reference on success
+            Py_DECREF(name);
+            Py_DECREF(result);
+            free(names);
+            return NULL;
+        }
     }
 
     free(names);
@@ -1169,7 +1174,8 @@ static PyObject* create_grid_stretched_py(PyObject* self, PyObject* args) {
             grid_destroy(g);
             return NULL;
         }
-        if (PyList_SetItem(x_list, (Py_ssize_t)i, val) < 0) {  // steals reference
+        if (PyList_SetItem(x_list, (Py_ssize_t)i, val) < 0) {  // steals reference on success
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
             Py_DECREF(x_list);
             Py_DECREF(y_list);
             Py_DECREF(grid_dict);
@@ -1187,7 +1193,8 @@ static PyObject* create_grid_stretched_py(PyObject* self, PyObject* args) {
             grid_destroy(g);
             return NULL;
         }
-        if (PyList_SetItem(y_list, (Py_ssize_t)i, val) < 0) {  // steals reference
+        if (PyList_SetItem(y_list, (Py_ssize_t)i, val) < 0) {  // steals reference on success
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
             Py_DECREF(x_list);
             Py_DECREF(y_list);
             Py_DECREF(grid_dict);
@@ -1269,6 +1276,7 @@ static PyObject* bc_apply_scalar_py(PyObject* self, PyObject* args, PyObject* kw
             return NULL;
         }
         if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
             free(field);
             return NULL;
         }
@@ -1344,8 +1352,19 @@ static PyObject* bc_apply_velocity_py(PyObject* self, PyObject* args, PyObject* 
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1410,7 +1429,11 @@ static PyObject* bc_apply_dirichlet_scalar_py(PyObject* self, PyObject* args, Py
             free(field);
             return NULL;
         }
-        PyList_SetItem(field_list, i, val);
+        if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);
+            free(field);
+            return NULL;
+        }
     }
 
     free(field);
@@ -1482,8 +1505,19 @@ static PyObject* bc_apply_noslip_py(PyObject* self, PyObject* args, PyObject* kw
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1561,8 +1595,19 @@ static PyObject* bc_apply_inlet_uniform_py(PyObject* self, PyObject* args, PyObj
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1640,8 +1685,19 @@ static PyObject* bc_apply_inlet_parabolic_py(PyObject* self, PyObject* args, PyO
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1708,7 +1764,11 @@ static PyObject* bc_apply_outlet_scalar_py(PyObject* self, PyObject* args, PyObj
             free(field);
             return NULL;
         }
-        PyList_SetItem(field_list, i, val);
+        if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);
+            free(field);
+            return NULL;
+        }
     }
 
     free(field);
@@ -1784,8 +1844,19 @@ static PyObject* bc_apply_outlet_velocity_py(PyObject* self, PyObject* args, PyO
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1948,7 +2019,13 @@ static PyObject* compute_velocity_magnitude_py(PyObject* self, PyObject* args) {
             flow_field_destroy(field);
             return NULL;
         }
-        PyList_SetItem(result, i, val);
+        if (PyList_SetItem(result, i, val) < 0) {
+            Py_DECREF(val);
+            Py_DECREF(result);
+            derived_fields_destroy(derived);
+            flow_field_destroy(field);
+            return NULL;
+        }
     }
 
     derived_fields_destroy(derived);

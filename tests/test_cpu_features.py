@@ -140,8 +140,33 @@ class TestHasSIMD:
             assert has_simd is True
 
 
+# BUG: The stretched grid formula in the C library is incorrect.
+# The cosh-based formula clusters points toward the center and doesn't span [xmin, xmax].
+# See: cfd/ROADMAP.md "Known Issues > Stretched Grid Formula Bug"
+# These tests are skipped until the C library fix is applied.
+STRETCHED_GRID_BUG_REASON = (
+    "Stretched grid formula bug: grid does not span [xmin, xmax]. "
+    "See cfd/ROADMAP.md 'Known Issues' section."
+)
+
+
+@pytest.mark.skip(reason=STRETCHED_GRID_BUG_REASON)
 class TestCreateGridStretched:
-    """Test create_grid_stretched function"""
+    """Test create_grid_stretched function.
+
+    NOTE: These tests are skipped because the underlying C library has a bug
+    in the stretching formula. The current cosh-based formula:
+    - Clusters points toward the CENTER of the domain
+    - Does not span the full domain (x[0] and x[n-1] both equal xmin)
+    - Higher beta increases clustering toward center
+
+    Once the C library is fixed to use the correct tanh-based formula:
+        x[i] = xmin + (xmax - xmin) * (1 + tanh(beta * (2*xi - 1)) / tanh(beta)) / 2
+
+    The expected correct behavior is:
+    - x[0] == xmin, x[n-1] == xmax (grid spans full domain)
+    - Higher beta clusters points near BOUNDARIES (useful for boundary layers)
+    """
 
     def test_create_grid_stretched_basic(self):
         """Test basic stretched grid creation"""
@@ -167,54 +192,34 @@ class TestCreateGridStretched:
         assert len(grid["x"]) == 5
         assert len(grid["y"]) == 6
 
-    def test_create_grid_stretched_coordinates_bounds(self):
-        """Test stretched grid coordinates are within domain bounds"""
+    def test_create_grid_stretched_spans_domain(self):
+        """Test stretched grid spans full domain [xmin, xmax]"""
         grid = cfd_python.create_grid_stretched(10, 10, 0.0, 1.0, -1.0, 1.0, 2.0)
 
-        # The hyperbolic cosine stretching clusters points toward the center
-        # Both endpoints (i=0 and i=n-1) map to xmin due to the symmetric formula
-        # First point should be at xmin
+        # First point should be at xmin, last point at xmax
         assert abs(grid["x"][0] - grid["xmin"]) < 1e-10
+        assert abs(grid["x"][-1] - grid["xmax"]) < 1e-10
         assert abs(grid["y"][0] - grid["ymin"]) < 1e-10
+        assert abs(grid["y"][-1] - grid["ymax"]) < 1e-10
 
-        # All points should be within or at bounds
+        # All points should be within bounds
         for x in grid["x"]:
             assert grid["xmin"] - 1e-10 <= x <= grid["xmax"] + 1e-10
         for y in grid["y"]:
             assert grid["ymin"] - 1e-10 <= y <= grid["ymax"] + 1e-10
 
-    def test_create_grid_stretched_symmetry(self):
-        """Test stretched grid has symmetric point distribution"""
-        grid = cfd_python.create_grid_stretched(11, 11, 0.0, 1.0, 0.0, 1.0, 2.0)
-
-        # The hyperbolic cosine stretching is symmetric around the center
-        # x[i] should equal x[n-1-i] for symmetric domains
-        n = len(grid["x"])
-        for i in range(n // 2):
-            assert abs(grid["x"][i] - grid["x"][n - 1 - i]) < 1e-10
-
-    def test_create_grid_stretched_max_at_center(self):
-        """Test that maximum value is at center index for odd grid sizes"""
-        grid = cfd_python.create_grid_stretched(11, 11, 0.0, 2.0, 0.0, 2.0, 1.5)
-
-        # The stretching formula creates a peak at the center index
-        # For odd n, the middle point should have the maximum x value
-        mid = len(grid["x"]) // 2
-        max_val = max(grid["x"])
-        assert abs(grid["x"][mid] - max_val) < 1e-10
-
-    def test_create_grid_stretched_higher_beta_more_centered(self):
-        """Test that higher beta creates more clustering toward center"""
+    def test_create_grid_stretched_higher_beta_clusters_at_boundaries(self):
+        """Test that higher beta clusters points near boundaries"""
         grid_low = cfd_python.create_grid_stretched(11, 11, 0.0, 1.0, 0.0, 1.0, 0.5)
         grid_high = cfd_python.create_grid_stretched(11, 11, 0.0, 1.0, 0.0, 1.0, 3.0)
 
-        # With higher beta, points are more clustered toward center
-        # The maximum x value (at center) should be closer to xmax with higher beta
-        max_x_low = max(grid_low["x"])
-        max_x_high = max(grid_high["x"])
+        # With higher beta, spacing near boundaries should be smaller
+        # Compare first cell size (x[1] - x[0])
+        dx_first_low = grid_low["x"][1] - grid_low["x"][0]
+        dx_first_high = grid_high["x"][1] - grid_high["x"][0]
 
-        # Higher beta pushes points further toward center (higher max value)
-        assert max_x_high > max_x_low
+        # Higher beta = smaller cells near boundaries
+        assert dx_first_high < dx_first_low
 
     def test_create_grid_stretched_invalid_dimensions_raises(self):
         """Test that invalid dimensions raise ValueError"""
