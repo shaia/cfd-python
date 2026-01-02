@@ -1591,6 +1591,302 @@ static PyObject* bc_apply_outlet_velocity_py(PyObject* self, PyObject* args, PyO
     Py_RETURN_NONE;
 }
 
+//=============================================================================
+// DERIVED FIELDS API (Phase 3)
+//=============================================================================
+
+/*
+ * Calculate field statistics (min, max, avg, sum)
+ */
+static PyObject* calculate_field_stats_py(PyObject* self, PyObject* args) {
+    (void)self;
+    PyObject* data_list;
+
+    if (!PyArg_ParseTuple(args, "O", &data_list)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(data_list)) {
+        PyErr_SetString(PyExc_TypeError, "data must be a list");
+        return NULL;
+    }
+
+    Py_ssize_t count = PyList_Size(data_list);
+    if (count == 0) {
+        PyErr_SetString(PyExc_ValueError, "data list cannot be empty");
+        return NULL;
+    }
+
+    // Convert list to C array
+    double* data = (double*)malloc((size_t)count * sizeof(double));
+    if (data == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate data array");
+        return NULL;
+    }
+
+    for (Py_ssize_t i = 0; i < count; i++) {
+        PyObject* item = PyList_GetItem(data_list, i);
+        data[i] = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            free(data);
+            return NULL;
+        }
+    }
+
+    // Calculate statistics
+    field_stats stats = calculate_field_statistics(data, (size_t)count);
+    free(data);
+
+    // Return as dictionary
+    PyObject* result = PyDict_New();
+    if (result == NULL) {
+        return NULL;
+    }
+
+    PyObject* min_val = PyFloat_FromDouble(stats.min_val);
+    PyObject* max_val = PyFloat_FromDouble(stats.max_val);
+    PyObject* avg_val = PyFloat_FromDouble(stats.avg_val);
+    PyObject* sum_val = PyFloat_FromDouble(stats.sum_val);
+
+    if (min_val == NULL || max_val == NULL || avg_val == NULL || sum_val == NULL) {
+        Py_XDECREF(min_val);
+        Py_XDECREF(max_val);
+        Py_XDECREF(avg_val);
+        Py_XDECREF(sum_val);
+        Py_DECREF(result);
+        return NULL;
+    }
+
+    if (PyDict_SetItemString(result, "min", min_val) < 0 ||
+        PyDict_SetItemString(result, "max", max_val) < 0 ||
+        PyDict_SetItemString(result, "avg", avg_val) < 0 ||
+        PyDict_SetItemString(result, "sum", sum_val) < 0) {
+        Py_DECREF(min_val);
+        Py_DECREF(max_val);
+        Py_DECREF(avg_val);
+        Py_DECREF(sum_val);
+        Py_DECREF(result);
+        return NULL;
+    }
+
+    Py_DECREF(min_val);
+    Py_DECREF(max_val);
+    Py_DECREF(avg_val);
+    Py_DECREF(sum_val);
+
+    return result;
+}
+
+/*
+ * Compute velocity magnitude from u,v components
+ */
+static PyObject* compute_velocity_magnitude_py(PyObject* self, PyObject* args) {
+    (void)self;
+    PyObject* u_list;
+    PyObject* v_list;
+    size_t nx, ny;
+
+    if (!PyArg_ParseTuple(args, "OOnn", &u_list, &v_list, &nx, &ny)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list)) {
+        PyErr_SetString(PyExc_TypeError, "u and v must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_Format(PyExc_ValueError,
+                     "u and v size must match nx*ny (%zu), got %zd and %zd",
+                     size, PyList_Size(u_list), PyList_Size(v_list));
+        return NULL;
+    }
+
+    // Create a temporary flow_field structure
+    flow_field* field = flow_field_create(nx, ny);
+    if (field == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
+        return NULL;
+    }
+
+    // Copy u, v from lists
+    for (size_t i = 0; i < size; i++) {
+        field->u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        field->v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        if (PyErr_Occurred()) {
+            flow_field_destroy(field);
+            return NULL;
+        }
+    }
+
+    // Create derived fields and compute velocity magnitude
+    derived_fields* derived = derived_fields_create(nx, ny);
+    if (derived == NULL) {
+        flow_field_destroy(field);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate derived fields");
+        return NULL;
+    }
+
+    derived_fields_compute_velocity_magnitude(derived, field);
+
+    // Create output list
+    PyObject* result = PyList_New(size);
+    if (result == NULL) {
+        derived_fields_destroy(derived);
+        flow_field_destroy(field);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; i++) {
+        PyObject* val = PyFloat_FromDouble(derived->velocity_magnitude[i]);
+        if (val == NULL) {
+            Py_DECREF(result);
+            derived_fields_destroy(derived);
+            flow_field_destroy(field);
+            return NULL;
+        }
+        PyList_SetItem(result, i, val);
+    }
+
+    derived_fields_destroy(derived);
+    flow_field_destroy(field);
+
+    return result;
+}
+
+/*
+ * Compute all field statistics for flow field components
+ */
+static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
+    (void)self;
+    PyObject* u_list;
+    PyObject* v_list;
+    PyObject* p_list;
+    size_t nx, ny;
+
+    if (!PyArg_ParseTuple(args, "OOOnn", &u_list, &v_list, &p_list, &nx, &ny)) {
+        return NULL;
+    }
+
+    if (!PyList_Check(u_list) || !PyList_Check(v_list) || !PyList_Check(p_list)) {
+        PyErr_SetString(PyExc_TypeError, "u, v, and p must be lists");
+        return NULL;
+    }
+
+    size_t size = nx * ny;
+    if ((size_t)PyList_Size(u_list) != size ||
+        (size_t)PyList_Size(v_list) != size ||
+        (size_t)PyList_Size(p_list) != size) {
+        PyErr_Format(PyExc_ValueError,
+                     "All fields must have size nx*ny (%zu)", size);
+        return NULL;
+    }
+
+    // Create a temporary flow_field structure
+    flow_field* field = flow_field_create(nx, ny);
+    if (field == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
+        return NULL;
+    }
+
+    // Copy data from lists
+    for (size_t i = 0; i < size; i++) {
+        field->u[i] = PyFloat_AsDouble(PyList_GetItem(u_list, i));
+        field->v[i] = PyFloat_AsDouble(PyList_GetItem(v_list, i));
+        field->p[i] = PyFloat_AsDouble(PyList_GetItem(p_list, i));
+        if (PyErr_Occurred()) {
+            flow_field_destroy(field);
+            return NULL;
+        }
+    }
+
+    // Create derived fields and compute statistics
+    derived_fields* derived = derived_fields_create(nx, ny);
+    if (derived == NULL) {
+        flow_field_destroy(field);
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate derived fields");
+        return NULL;
+    }
+
+    // First compute velocity magnitude (required for vel_mag_stats)
+    derived_fields_compute_velocity_magnitude(derived, field);
+    // Then compute all statistics
+    derived_fields_compute_statistics(derived, field);
+
+    // Build result dictionary with all statistics
+    PyObject* result = PyDict_New();
+    if (result == NULL) {
+        derived_fields_destroy(derived);
+        flow_field_destroy(field);
+        return NULL;
+    }
+
+    // Helper macro to add stats dict (properly handles reference counts and errors)
+    #define ADD_STATS(name, stats_struct) do { \
+        PyObject* stats_dict = PyDict_New(); \
+        if (stats_dict == NULL) { \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
+        PyObject* tmp_min = PyFloat_FromDouble((stats_struct).min_val); \
+        PyObject* tmp_max = PyFloat_FromDouble((stats_struct).max_val); \
+        PyObject* tmp_avg = PyFloat_FromDouble((stats_struct).avg_val); \
+        PyObject* tmp_sum = PyFloat_FromDouble((stats_struct).sum_val); \
+        if (tmp_min == NULL || tmp_max == NULL || tmp_avg == NULL || tmp_sum == NULL) { \
+            Py_XDECREF(tmp_min); \
+            Py_XDECREF(tmp_max); \
+            Py_XDECREF(tmp_avg); \
+            Py_XDECREF(tmp_sum); \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
+        if (PyDict_SetItemString(stats_dict, "min", tmp_min) < 0 || \
+            PyDict_SetItemString(stats_dict, "max", tmp_max) < 0 || \
+            PyDict_SetItemString(stats_dict, "avg", tmp_avg) < 0 || \
+            PyDict_SetItemString(stats_dict, "sum", tmp_sum) < 0) { \
+            Py_DECREF(tmp_min); \
+            Py_DECREF(tmp_max); \
+            Py_DECREF(tmp_avg); \
+            Py_DECREF(tmp_sum); \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
+        Py_DECREF(tmp_min); \
+        Py_DECREF(tmp_max); \
+        Py_DECREF(tmp_avg); \
+        Py_DECREF(tmp_sum); \
+        if (PyDict_SetItemString(result, name, stats_dict) < 0) { \
+            Py_DECREF(stats_dict); \
+            Py_DECREF(result); \
+            derived_fields_destroy(derived); \
+            flow_field_destroy(field); \
+            return NULL; \
+        } \
+        Py_DECREF(stats_dict); \
+    } while(0)
+
+    ADD_STATS("u", derived->u_stats);
+    ADD_STATS("v", derived->v_stats);
+    ADD_STATS("p", derived->p_stats);
+    ADD_STATS("velocity_magnitude", derived->vel_mag_stats);
+
+    #undef ADD_STATS
+
+    derived_fields_destroy(derived);
+    flow_field_destroy(field);
+
+    return result;
+}
+
 /*
  * Module definition
  */
@@ -1794,6 +2090,33 @@ static PyMethodDef cfd_python_methods[] = {
      "    nx (int): Grid points in x direction\n"
      "    ny (int): Grid points in y direction\n"
      "    edge (int, optional): Boundary edge (default: BC_EDGE_RIGHT)"},
+    // Derived Fields API (Phase 3)
+    {"calculate_field_stats", calculate_field_stats_py, METH_VARARGS,
+     "Calculate statistics (min, max, avg, sum) for a field.\n\n"
+     "Args:\n"
+     "    data (list): Field data as flat list\n\n"
+     "Returns:\n"
+     "    dict: Statistics with keys 'min', 'max', 'avg', 'sum'"},
+    {"compute_velocity_magnitude", compute_velocity_magnitude_py, METH_VARARGS,
+     "Compute velocity magnitude from u and v components.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field\n"
+     "    v (list): Y-velocity field\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n\n"
+     "Returns:\n"
+     "    list: Velocity magnitude field (sqrt(u^2 + v^2))"},
+    {"compute_flow_statistics", compute_flow_statistics_py, METH_VARARGS,
+     "Compute statistics for all flow field components.\n\n"
+     "Args:\n"
+     "    u (list): X-velocity field\n"
+     "    v (list): Y-velocity field\n"
+     "    p (list): Pressure field\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n\n"
+     "Returns:\n"
+     "    dict: Statistics for 'u', 'v', 'p', 'velocity_magnitude'\n"
+     "          Each contains 'min', 'max', 'avg', 'sum'"},
     // Solver Backend Availability API (v0.1.6)
     {"backend_is_available", backend_is_available_py, METH_VARARGS,
      "Check if a solver backend is available at runtime.\n\n"

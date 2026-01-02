@@ -62,6 +62,11 @@ Boundary conditions:
         - bc_apply_outlet_scalar(field, nx, ny, edge): Zero-gradient outlet
         - bc_apply_outlet_velocity(u, v, nx, ny, edge): Zero-gradient outlet
 
+Derived fields and statistics:
+    - calculate_field_stats(data): Compute min, max, avg, sum for a field
+    - compute_velocity_magnitude(u, v, nx, ny): Compute sqrt(u^2 + v^2)
+    - compute_flow_statistics(u, v, p, nx, ny): Statistics for all flow components
+
 Solver backend availability (v0.1.6):
     Backends:
         - BACKEND_SCALAR: Basic scalar CPU implementation
@@ -147,6 +152,10 @@ _CORE_EXPORTS = [
     "bc_apply_inlet_parabolic",
     "bc_apply_outlet_scalar",
     "bc_apply_outlet_velocity",
+    # Derived fields API (Phase 3)
+    "calculate_field_stats",
+    "compute_velocity_magnitude",
+    "compute_flow_statistics",
     # Solver backend constants (v0.1.6)
     "BACKEND_SCALAR",
     "BACKEND_SIMD",
