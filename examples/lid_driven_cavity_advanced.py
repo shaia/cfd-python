@@ -16,10 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import cfd_python
-    from cfd_python import (
-        CFDError,
-        raise_for_status,
-    )
 except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure to build the package first:")
@@ -115,9 +111,9 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
             # Check status
             status = cfd_python.get_last_status()
             if status != cfd_python.CFD_SUCCESS:
-                raise_for_status(status, context=f"step {step}")
+                cfd_python.raise_for_status(status, context=f"step {step}")
 
-        except CFDError as e:
+        except cfd_python.CFDError as e:
             print(f"Simulation error at step {step}: {e}")
             break
 

@@ -16,10 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import cfd_python
-    from cfd_python import (
-        BC_EDGE_LEFT,
-        BC_EDGE_RIGHT,
-    )
 except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure to build the package first:")
@@ -45,10 +41,10 @@ def setup_channel_flow(nx, ny, u_max=1.0):
     p = [0.0] * size
 
     # Apply inlet BC (parabolic profile on left edge)
-    cfd_python.bc_apply_inlet_parabolic(u, v, nx, ny, u_max, BC_EDGE_LEFT)
+    cfd_python.bc_apply_inlet_parabolic(u, v, nx, ny, u_max, cfd_python.BC_EDGE_LEFT)
 
     # Apply outlet BC (zero-gradient on right edge)
-    cfd_python.bc_apply_outlet_velocity(u, v, nx, ny, BC_EDGE_RIGHT)
+    cfd_python.bc_apply_outlet_velocity(u, v, nx, ny, cfd_python.BC_EDGE_RIGHT)
 
     # Apply no-slip walls on top and bottom
     # Note: bc_apply_noslip applies to all boundaries, so we apply walls specifically
