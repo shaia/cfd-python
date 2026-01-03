@@ -47,8 +47,9 @@ def main():
     print("\n2. Computing Velocity Magnitude")
     print("-" * 60)
 
-    # Create sample velocity fields (since run_simulation returns magnitude)
-    # For demonstration, create synthetic fields
+    # Create synthetic velocity fields for demonstrating compute_velocity_magnitude().
+    # Note: run_simulation_with_params() returns only velocity_magnitude, not the
+    # component fields. We create these synthetic fields to show the API usage.
     u = [0.0] * (nx * ny)
     v = [0.0] * (nx * ny)
 
