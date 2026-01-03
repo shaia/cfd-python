@@ -92,10 +92,10 @@ class TestExceptionClasses:
         assert err.status_code == -3
 
     def test_cfd_io_error_inheritance(self):
-        """Test CFDIOError inherits from both CFDError and IOError"""
+        """Test CFDIOError inherits from both CFDError and OSError"""
         err = cfd_python.CFDIOError("file not found", -4)
         assert isinstance(err, cfd_python.CFDError)
-        assert isinstance(err, IOError)
+        assert isinstance(err, OSError)
         assert err.status_code == -4
 
     def test_cfd_unsupported_error_inheritance(self):

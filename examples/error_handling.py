@@ -79,7 +79,7 @@ def main():
         ("CFDError", cfd_python.CFDError, Exception),
         ("CFDMemoryError", cfd_python.CFDMemoryError, MemoryError),
         ("CFDInvalidError", cfd_python.CFDInvalidError, ValueError),
-        ("CFDIOError", cfd_python.CFDIOError, IOError),
+        ("CFDIOError", cfd_python.CFDIOError, OSError),
         ("CFDUnsupportedError", cfd_python.CFDUnsupportedError, NotImplementedError),
         ("CFDDivergedError", cfd_python.CFDDivergedError, cfd_python.CFDError),
         ("CFDMaxIterError", cfd_python.CFDMaxIterError, cfd_python.CFDError),
