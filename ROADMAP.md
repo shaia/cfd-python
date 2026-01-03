@@ -1135,6 +1135,144 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 
 ---
 
+## Phase 25: Machine Learning & Physics-Informed Neural Networks
+
+**Priority:** P3 - Research/Experimental
+**Estimated Effort:** 2-4 weeks
+
+### Goals
+
+- Enable ML-based surrogate models trained on CFD solver outputs
+- Support Physics-Informed Neural Networks (PINNs) for fast inference
+- Provide data generation utilities for training datasets
+
+### Background
+
+Physics-Informed Neural Networks embed physical laws (Navier-Stokes equations) into the loss function, achieving:
+- ~1000× speedup over traditional CFD for inference
+- <5% relative error for velocity fields
+- 5-10× less memory than CFD solvers
+
+Limitation: Performance degrades for Re > 200 (transitional/turbulent flows).
+
+### Tasks
+
+- [ ] **25.1 Dataset Generation Module**
+
+  ```python
+  from cfd_python.ml import DatasetGenerator
+
+  # Generate training data from CFD simulations
+  generator = DatasetGenerator(
+      solver="projection",
+      grid_sizes=[(32, 32), (64, 64), (128, 128)],
+      reynolds_range=(10, 200),
+      n_samples=500
+  )
+
+  # Returns numpy arrays suitable for ML frameworks
+  X_train, y_train = generator.generate()
+
+  # Export to common formats
+  generator.to_hdf5("training_data.h5")
+  generator.to_numpy("training_data.npz")
+  ```
+
+- [ ] **25.2 PINN Loss Function Utilities**
+
+  ```python
+  from cfd_python.ml import NavierStokesLoss
+
+  # Physics loss for PINNs (framework-agnostic numpy version)
+  ns_loss = NavierStokesLoss(Re=100, dx=0.01, dy=0.01)
+
+  # Compute residuals for Navier-Stokes equations
+  continuity_residual = ns_loss.continuity(u, v)
+  momentum_x_residual = ns_loss.momentum_x(u, v, p)
+  momentum_y_residual = ns_loss.momentum_y(u, v, p)
+  ```
+
+- [ ] **25.3 PyTorch Integration (Optional Dependency)**
+
+  ```python
+  from cfd_python.ml.torch import PINNLoss, CFDDataset
+
+  # PyTorch-native physics loss
+  criterion = PINNLoss(
+      data_weight=1.0,
+      physics_weight=0.1,  # Balance data vs physics
+      Re=100
+  )
+
+  # Dataset compatible with DataLoader
+  dataset = CFDDataset.from_hdf5("training_data.h5")
+  loader = DataLoader(dataset, batch_size=32)
+  ```
+
+- [ ] **25.4 Pre-trained Model Zoo**
+
+  ```python
+  from cfd_python.ml import load_pretrained
+
+  # Load pre-trained surrogate model
+  model = load_pretrained("cavity_flow_64x64")
+
+  # Fast inference (~1000x faster than CFD)
+  u, v, p = model.predict(Re=100, lid_velocity=1.0)
+  ```
+
+- [ ] **25.5 Benchmark Comparisons**
+
+  ```python
+  from cfd_python.ml import benchmark_surrogate
+
+  # Compare surrogate vs CFD solver
+  results = benchmark_surrogate(
+      model=surrogate_model,
+      solver="projection",
+      test_cases=[(Re=50), (Re=100), (Re=150)],
+      metrics=["l2_error", "max_error", "inference_time"]
+  )
+
+  print(results.summary())
+  # Re=50:  L2=0.023, Max=0.045, Speedup=1243x
+  # Re=100: L2=0.031, Max=0.067, Speedup=1156x
+  # Re=150: L2=0.048, Max=0.092, Speedup=1089x
+  ```
+
+### Optional Dependencies
+
+```toml
+[project.optional-dependencies]
+ml = ["numpy>=1.20", "h5py>=3.0"]
+ml-torch = ["torch>=2.0", "cfd-python[ml]"]
+ml-jax = ["jax>=0.4", "flax>=0.7", "cfd-python[ml]"]
+```
+
+### Neural Network Architectures to Support
+
+| Architecture | Use Case | Notes |
+|--------------|----------|-------|
+| **Fully Connected** | Simple surrogate | Fast training, limited accuracy |
+| **Convolutional** | Grid-based predictions | Good for structured grids |
+| **Fourier Neural Operator** | Resolution-independent | State-of-the-art for PDEs |
+| **Graph Neural Network** | Irregular meshes | Handles complex geometries |
+
+### References
+
+- [Physics-Informed Neural Networks (Raissi et al.)](https://www.sciencedirect.com/science/article/pii/S0021999118307125)
+- [Fourier Neural Operator (Li et al.)](https://arxiv.org/abs/2010.08895)
+- [DeepXDE Library](https://deepxde.readthedocs.io/)
+
+### Success Criteria
+
+- Dataset generation works with all supported solvers
+- PyTorch integration passes CI tests
+- Pre-trained models achieve <5% error on benchmark cases
+- Documentation includes end-to-end PINN training example
+
+---
+
 ## Version Planning
 
 | Version | Phases | Focus |
@@ -1146,6 +1284,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 | 0.6.0 | 15, 16 | 3D support & checkpointing |
 | 0.7.0 | 18, 19, 23 | Jupyter, config & logging |
 | 0.8.0 | 20, 21, 22 | Plugins & memory optimization |
+| 0.9.0 | 25 | ML & PINN integration |
 | 1.0.0 | 24 | Documentation & stabilization |
 
 ---

@@ -781,7 +781,11 @@ static PyObject* get_last_error(PyObject* self, PyObject* args) {
 
     const char* error = cfd_get_last_error();
     if (error && error[0] != '\0') {
-        return PyUnicode_FromString(error);
+        PyObject* result = PyUnicode_FromString(error);
+        if (result == NULL) {
+            return NULL;  // PyUnicode_FromString sets exception on failure
+        }
+        return result;
     }
     Py_RETURN_NONE;
 }
@@ -794,7 +798,11 @@ static PyObject* get_last_status(PyObject* self, PyObject* args) {
     (void)args;
 
     cfd_status_t status = cfd_get_last_status();
-    return PyLong_FromLong((long)status);
+    PyObject* result = PyLong_FromLong((long)status);
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
 }
 
 /*
@@ -820,7 +828,11 @@ static PyObject* get_error_string(PyObject* self, PyObject* args) {
     }
 
     const char* str = cfd_get_error_string((cfd_status_t)status);
-    return PyUnicode_FromString(str);
+    PyObject* result = PyUnicode_FromString(str);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /* ============================================================================
@@ -833,7 +845,11 @@ static PyObject* get_error_string(PyObject* self, PyObject* args) {
 static PyObject* bc_get_backend_py(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
-    return PyLong_FromLong((long)bc_get_backend());
+    PyObject* result = PyLong_FromLong((long)bc_get_backend());
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
 }
 
 /*
@@ -842,7 +858,11 @@ static PyObject* bc_get_backend_py(PyObject* self, PyObject* args) {
 static PyObject* bc_get_backend_name_py(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
-    return PyUnicode_FromString(bc_get_backend_name());
+    PyObject* result = PyUnicode_FromString(bc_get_backend_name());
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /*
@@ -911,7 +931,11 @@ static PyObject* backend_get_name_py(PyObject* self, PyObject* args) {
     if (name == NULL) {
         Py_RETURN_NONE;
     }
-    return PyUnicode_FromString(name);
+    PyObject* result = PyUnicode_FromString(name);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /*
@@ -1028,7 +1052,11 @@ static PyObject* get_simd_arch_py(PyObject* self, PyObject* args) {
     (void)args;
 
     cfd_simd_arch_t arch = cfd_detect_simd_arch();
-    return PyLong_FromLong((long)arch);
+    PyObject* result = PyLong_FromLong((long)arch);
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
 }
 
 /*
@@ -1040,7 +1068,11 @@ static PyObject* get_simd_name_py(PyObject* self, PyObject* args) {
     (void)args;
 
     const char* name = cfd_get_simd_name();
-    return PyUnicode_FromString(name);
+    PyObject* result = PyUnicode_FromString(name);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /*
