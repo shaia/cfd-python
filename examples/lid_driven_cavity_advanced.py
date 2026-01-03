@@ -82,10 +82,17 @@ def setup_lid_driven_cavity(nx, ny, lid_velocity=1.0):
 def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
     """Run lid-driven cavity simulation.
 
+    Note: This example demonstrates the API usage pattern for monitoring convergence
+    and writing output. The current `run_simulation_with_params()` API runs a fresh
+    simulation each call and returns velocity magnitude - it doesn't expose the
+    internal u, v, p fields for true time-stepping continuation. Each iteration
+    here runs an independent simulation with increasing step counts to show how
+    the solution evolves.
+
     Args:
         nx, ny: Grid dimensions
         Re: Reynolds number
-        steps: Total time steps
+        steps: Total time steps (used for progress monitoring)
         output_interval: Steps between VTK outputs
 
     Returns:
@@ -117,30 +124,44 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
     # Initialize fields
     u, v, p = setup_lid_driven_cavity(nx, ny, lid_velocity)
 
-    # Track convergence
-    max_velocities = []
-    residuals = []
+    # Track convergence across different step counts
+    max_velocities = []  # Max velocity at each sample point
+    residuals = []  # Relative change between samples
 
-    print("\nRunning simulation...")
-    print(f"{'Step':>6} {'Max U':>12} {'Max V':>12} {'Residual':>12}")
+    # Run simulation and track convergence by comparing results at different step counts
+    # Note: The API runs a fresh simulation each call, so we sample at key intervals
+    # to show how the solution evolves with more time steps.
+    print("\nRunning convergence study...")
+    print(f"{'Steps':>6} {'Max Vel':>12} {'Avg Vel':>12} {'Change':>12}")
     print("-" * 48)
 
-    prev_u = u.copy()
+    prev_max = 0.0
+    sample_steps = [1, 5, 10, 25, 50, 100, 150, 200]
+    sample_steps = [s for s in sample_steps if s <= steps]
+    if steps not in sample_steps:
+        sample_steps.append(steps)
 
-    for step in range(steps):
-        # Run simulation step using the library
+    for sim_steps in sample_steps:
         try:
             result = cfd_python.run_simulation_with_params(
-                nx=nx, ny=ny, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, steps=1, dt=dt, cfl=0.25
+                nx=nx,
+                ny=ny,
+                xmin=xmin,
+                xmax=xmax,
+                ymin=ymin,
+                ymax=ymax,
+                steps=sim_steps,
+                dt=dt,
+                cfl=0.25,
             )
 
             # Check status
             status = cfd_python.get_last_status()
             if status != cfd_python.CFD_SUCCESS:
-                cfd_python.raise_for_status(status, context=f"step {step}")
+                cfd_python.raise_for_status(status, context=f"steps={sim_steps}")
 
         except cfd_python.CFDError as e:
-            print(f"Simulation error at step {step}: {e}")
+            print(f"Simulation error at steps={sim_steps}: {e}")
             break
 
         # Get velocity magnitude from result
@@ -151,23 +172,20 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
         max_vel = stats["max"]
         max_velocities.append(max_vel)
 
-        # Compute residual (change in velocity)
-        if step > 0:
-            residual = sum(abs(vel_mag[i] - prev_u[i]) for i in range(len(vel_mag))) / len(vel_mag)
-            residuals.append(residual)
+        # Compute change from previous sample
+        if prev_max > 0:
+            change = abs(max_vel - prev_max) / prev_max
+            residuals.append(change)
         else:
-            residual = float("inf")
+            change = float("inf")
 
-        prev_u = vel_mag.copy()
+        prev_max = max_vel
 
-        # Output progress
-        if step % max(1, steps // 10) == 0 or step == steps - 1:
-            u_stats = cfd_python.calculate_field_stats(vel_mag)
-            print(f"{step:6d} {u_stats['max']:12.6f} {u_stats['avg']:12.6f} {residual:12.2e}")
+        print(f"{sim_steps:6d} {stats['max']:12.6f} {stats['avg']:12.6f} {change:12.2e}")
 
-        # Write VTK output
-        if step % output_interval == 0 or step == steps - 1:
-            filename = os.path.join(output_dir, f"cavity_step_{step:05d}.vtk")
+        # Write VTK output at final step
+        if sim_steps == steps:
+            filename = os.path.join(output_dir, "cavity_final.vtk")
             cfd_python.write_vtk_scalar(
                 filename, "velocity_magnitude", vel_mag, nx, ny, xmin, xmax, ymin, ymax
             )
@@ -236,17 +254,19 @@ def main():
     # Analyze results
     analyze_results(results)
 
-    # Run parameter study (optional)
+    # Run parameter study: grid resolution effect
+    # Note: The current API doesn't expose viscosity/Reynolds number parameters,
+    # so we demonstrate grid resolution effects instead.
     print("\n" + "=" * 60)
-    print("Parameter Study: Effect of Reynolds Number")
+    print("Parameter Study: Effect of Grid Resolution")
     print("=" * 60)
 
-    for Re in [50, 100, 200]:
+    for grid_size in [16, 32, 48]:
         result = cfd_python.run_simulation_with_params(
-            nx=32, ny=32, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, steps=100, dt=0.0001
+            nx=grid_size, ny=grid_size, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, steps=100, dt=0.0001
         )
         stats = cfd_python.calculate_field_stats(result["velocity_magnitude"])
-        print(f"  Re={Re:3d}: max_vel={stats['max']:.4f}, avg_vel={stats['avg']:.4f}")
+        print(f"  {grid_size}x{grid_size}: max_vel={stats['max']:.4f}, avg_vel={stats['avg']:.4f}")
 
 
 if __name__ == "__main__":
