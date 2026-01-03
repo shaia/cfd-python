@@ -196,11 +196,11 @@ def main():
     except ValueError as e:
         print(f"     Caught as ValueError: {e}")
 
-    # CFDIOError can be caught as IOError
+    # CFDIOError can be caught as OSError (IOError is an alias in Python 3)
     try:
         raise cfd_python.CFDIOError(-4, "Cannot write to output file")
     except OSError as e:
-        print(f"     Caught as IOError: {e}")
+        print(f"     Caught as OSError: {e}")
 
     # =================================================================
     # Summary
