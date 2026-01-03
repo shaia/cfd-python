@@ -139,7 +139,7 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
         prev_u = vel_mag.copy()
 
         # Output progress
-        if step % (steps // 10) == 0 or step == steps - 1:
+        if step % max(1, steps // 10) == 0 or step == steps - 1:
             u_stats = cfd_python.calculate_field_stats(vel_mag)
             print(f"{step:6d} {u_stats['max']:12.6f} {u_stats['avg']:12.6f} {residual:12.2e}")
 
