@@ -87,8 +87,8 @@ def main():
 
     print("   Exception hierarchy (showing Method Resolution Order):")
     for name, exc_class, _ in exceptions:
-        # __mro__[1:-1] gives all base classes except the class itself and 'object'
-        bases = ", ".join(b.__name__ for b in exc_class.__mro__[1:-1])
+        # Filter MRO to show base classes, excluding the class itself and 'object'
+        bases = ", ".join(b.__name__ for b in exc_class.__mro__ if b not in (exc_class, object))
         print(f"     {name} <- {bases}")
 
     # =================================================================
