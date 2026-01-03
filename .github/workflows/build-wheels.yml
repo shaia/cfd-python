@@ -146,8 +146,25 @@ jobs:
           dir cfd\build\lib\Release
 
       # ============ Build wheels ============
-      - name: Build wheel (Unix)
-        if: runner.os != 'Windows'
+      - name: Build wheel (Linux)
+        if: runner.os == 'Linux'
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+          CFD_USE_STABLE_ABI: "ON"
+        run: |
+          pip wheel . --no-deps --wheel-dir dist_raw/
+          echo "=== Wheel built (raw) ==="
+          ls -la dist_raw/
+          # Repair wheel to add manylinux tag (required for PyPI)
+          pip install auditwheel patchelf
+          mkdir -p dist
+          auditwheel repair dist_raw/*.whl --plat manylinux_2_17_x86_64 -w dist/
+          echo "=== Wheel repaired (manylinux) ==="
+          ls -la dist/
+
+      - name: Build wheel (macOS)
+        if: runner.os == 'macOS'
         env:
           CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
