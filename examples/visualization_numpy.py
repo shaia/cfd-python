@@ -23,6 +23,10 @@ def main():
     print("CFD Python - NumPy Analysis Example")
     print("=" * 50)
 
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     # Run simulation
     nx, ny = 30, 30
     print(f"\n1. Running simulation ({nx}x{ny} grid, 50 steps)...")
@@ -124,10 +128,10 @@ def main():
     print("-" * 50)
 
     # Save as CSV for external tools
-    output_file = "velocity_data.csv"
+    output_file = os.path.join(output_dir, "velocity_data.csv")
     flat_data = np.column_stack([X.flatten(), Y.flatten(), vel_mag.flatten()])
     np.savetxt(output_file, flat_data, delimiter=",", header="x,y,velocity_magnitude", comments="")
-    print(f"   Saved to: {output_file}")
+    print("   Saved to: output/velocity_data.csv")
     print(f"   Shape: {flat_data.shape}")
 
     print("\n" + "=" * 50)

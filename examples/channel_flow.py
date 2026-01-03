@@ -103,6 +103,10 @@ def main():
     print("CFD Python - Channel Flow Example")
     print("=" * 60)
 
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     # Parameters
     nx, ny = 64, 32  # Longer in x for channel flow
     xmin, xmax = 0.0, 4.0  # Channel length = 4
@@ -181,7 +185,7 @@ def main():
 
     # Velocity magnitude
     cfd_python.write_vtk_scalar(
-        "channel_velocity_magnitude.vtk",
+        os.path.join(output_dir, "channel_velocity_magnitude.vtk"),
         "velocity_magnitude",
         vel_mag,
         nx,
@@ -194,11 +198,20 @@ def main():
 
     # Velocity vectors
     cfd_python.write_vtk_vector(
-        "channel_velocity.vtk", "velocity", u, v, nx, ny, xmin, xmax, ymin, ymax
+        os.path.join(output_dir, "channel_velocity.vtk"),
+        "velocity",
+        u,
+        v,
+        nx,
+        ny,
+        xmin,
+        xmax,
+        ymin,
+        ymax,
     )
 
-    print("  channel_velocity_magnitude.vtk")
-    print("  channel_velocity.vtk")
+    print("  output/channel_velocity_magnitude.vtk")
+    print("  output/channel_velocity.vtk")
 
     # Cross-section profiles
     print("\n" + "=" * 60)

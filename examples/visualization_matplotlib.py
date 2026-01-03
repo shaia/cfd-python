@@ -66,6 +66,11 @@ def main():
     print("CFD Python - Matplotlib Visualization Example")
     print("=" * 60)
 
+    # Create output directory for generated images
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"\nOutput directory: {output_dir}")
+
     # =================================================================
     # 1. Run Simulation
     # =================================================================
@@ -112,9 +117,11 @@ def main():
     ax.set_ylabel("Y")
     ax.set_title("Velocity Magnitude Field")
     ax.set_aspect("equal")
-    plt.savefig("velocity_magnitude_contour.png", dpi=150, bbox_inches="tight")
+    plt.savefig(
+        os.path.join(output_dir, "velocity_magnitude_contour.png"), dpi=150, bbox_inches="tight"
+    )
     plt.close()
-    print("   Saved: velocity_magnitude_contour.png")
+    print("   Saved: output/velocity_magnitude_contour.png")
 
     # =================================================================
     # 3. Synthetic Vortex Visualization
@@ -178,9 +185,9 @@ def main():
     ax4.set_aspect("equal")
 
     plt.tight_layout()
-    plt.savefig("vortex_visualization.png", dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(output_dir, "vortex_visualization.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print("   Saved: vortex_visualization.png")
+    print("   Saved: output/vortex_visualization.png")
 
     # =================================================================
     # 4. Centerline Profiles
@@ -215,61 +222,62 @@ def main():
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("centerline_profiles.png", dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(output_dir, "centerline_profiles.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print("   Saved: centerline_profiles.png")
+    print("   Saved: output/centerline_profiles.png")
 
     # =================================================================
-    # 5. Convergence History
+    # 5. Convergence History (Grid Resolution Study)
     # =================================================================
-    print("\n5. Creating Convergence History Plot")
+    print("\n5. Creating Convergence Analysis Plot")
     print("-" * 60)
 
-    # Run multiple steps and track convergence
+    # Since each run_simulation_with_params() call is independent,
+    # we show convergence by comparing results at different step counts
+    step_counts = [10, 20, 30, 50, 75, 100, 150, 200]
     max_velocities = []
-    residuals = []
-    steps_list = []
-    prev_vel = None
+    avg_velocities = []
 
-    for step in range(50):
+    for steps in step_counts:
         result = cfd_python.run_simulation_with_params(
-            nx=32, ny=32, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, steps=1, dt=0.001
+            nx=32, ny=32, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, steps=steps, dt=0.001
         )
-        vel = np.array(result["velocity_magnitude"])
         stats = cfd_python.calculate_field_stats(result["velocity_magnitude"])
         max_velocities.append(stats["max"])
-        steps_list.append(step)
+        avg_velocities.append(stats["avg"])
 
-        if prev_vel is not None:
-            residual = np.mean(np.abs(vel - prev_vel))
-            residuals.append(residual)
-        else:
-            residuals.append(np.nan)
-        prev_vel = vel.copy()
+    # Compute relative change between consecutive step counts
+    relative_changes = []
+    for i in range(1, len(max_velocities)):
+        change = abs(max_velocities[i] - max_velocities[i - 1]) / max_velocities[i - 1]
+        relative_changes.append(change)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-    # Max velocity history
+    # Velocity vs steps
     ax1 = axes[0]
-    ax1.plot(steps_list, max_velocities, "b-", linewidth=2)
-    ax1.set_xlabel("Step")
-    ax1.set_ylabel("Max Velocity")
-    ax1.set_title("Maximum Velocity History")
+    ax1.plot(step_counts, max_velocities, "b-o", linewidth=2, label="Max Velocity")
+    ax1.plot(step_counts, avg_velocities, "g--s", linewidth=2, label="Avg Velocity")
+    ax1.set_xlabel("Number of Steps")
+    ax1.set_ylabel("Velocity")
+    ax1.set_title("Velocity vs Simulation Steps")
+    ax1.legend()
     ax1.grid(True, alpha=0.3)
 
-    # Residual history (skip first NaN, filter zeros for log scale)
+    # Relative change (convergence indicator)
     ax2 = axes[1]
-    valid_residuals = [r if r > 0 else 1e-16 for r in residuals[1:]]
-    ax2.semilogy(steps_list[1:], valid_residuals, "r-", linewidth=2)
-    ax2.set_xlabel("Step")
-    ax2.set_ylabel("Residual (L1 norm)")
-    ax2.set_title("Convergence History")
+    ax2.semilogy(step_counts[1:], relative_changes, "r-o", linewidth=2)
+    ax2.set_xlabel("Number of Steps")
+    ax2.set_ylabel("Relative Change")
+    ax2.set_title("Convergence (Relative Change in Max Velocity)")
     ax2.grid(True, alpha=0.3)
+    ax2.axhline(y=0.01, color="k", linestyle="--", alpha=0.5, label="1% threshold")
+    ax2.legend()
 
     plt.tight_layout()
-    plt.savefig("convergence_history.png", dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(output_dir, "convergence_history.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print("   Saved: convergence_history.png")
+    print("   Saved: output/convergence_history.png")
 
     # =================================================================
     # 6. Grid Comparison
@@ -298,9 +306,9 @@ def main():
         ax.set_aspect("equal")
 
     plt.tight_layout()
-    plt.savefig("grid_comparison.png", dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(output_dir, "grid_comparison.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print("   Saved: grid_comparison.png")
+    print("   Saved: output/grid_comparison.png")
 
     # =================================================================
     # 7. 3D Surface Plot
@@ -318,9 +326,9 @@ def main():
     ax.set_zlabel("Velocity Magnitude")
     ax.set_title("3D Velocity Magnitude Surface")
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10, label="Velocity")
-    plt.savefig("velocity_surface_3d.png", dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(output_dir, "velocity_surface_3d.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print("   Saved: velocity_surface_3d.png")
+    print("   Saved: output/velocity_surface_3d.png")
 
     # =================================================================
     # Summary
@@ -328,7 +336,7 @@ def main():
     print("\n" + "=" * 60)
     print("Visualization Example Complete!")
     print("=" * 60)
-    print("\nGenerated files:")
+    print(f"\nGenerated files in {output_dir}:")
     print("  - velocity_magnitude_contour.png: Basic contour plot")
     print("  - vortex_visualization.png: Multi-panel vortex analysis")
     print("  - centerline_profiles.png: 1D profile plots")

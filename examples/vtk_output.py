@@ -111,10 +111,10 @@ def main():
     print(f"   Domain: [{xmin}, {xmax}] x [{ymin}, {ymax}]")
 
     # Create output directory
-    output_dir = "vtk_output"
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
     os.makedirs(output_dir, exist_ok=True)
     cfd_python.set_output_dir(output_dir)
-    print(f"   Output directory: {output_dir}/")
+    print("   Output directory: output/")
 
     # Create sample data
     fields = create_sample_fields(nx, ny, xmin, xmax, ymin, ymax)
@@ -128,22 +128,46 @@ def main():
 
     # Write pressure field
     cfd_python.write_vtk_scalar(
-        "pressure.vtk", "pressure", fields["pressure"], nx, ny, xmin, xmax, ymin, ymax
+        os.path.join(output_dir, "pressure.vtk"),
+        "pressure",
+        fields["pressure"],
+        nx,
+        ny,
+        xmin,
+        xmax,
+        ymin,
+        ymax,
     )
-    print("   Written: pressure.vtk")
+    print("   Written: output/pressure.vtk")
 
     # Write temperature field
     cfd_python.write_vtk_scalar(
-        "temperature.vtk", "temperature", fields["temperature"], nx, ny, xmin, xmax, ymin, ymax
+        os.path.join(output_dir, "temperature.vtk"),
+        "temperature",
+        fields["temperature"],
+        nx,
+        ny,
+        xmin,
+        xmax,
+        ymin,
+        ymax,
     )
-    print("   Written: temperature.vtk")
+    print("   Written: output/temperature.vtk")
 
     # Compute and write velocity magnitude
     vel_mag = cfd_python.compute_velocity_magnitude(fields["u"], fields["v"], nx, ny)
     cfd_python.write_vtk_scalar(
-        "velocity_magnitude.vtk", "velocity_magnitude", vel_mag, nx, ny, xmin, xmax, ymin, ymax
+        os.path.join(output_dir, "velocity_magnitude.vtk"),
+        "velocity_magnitude",
+        vel_mag,
+        nx,
+        ny,
+        xmin,
+        xmax,
+        ymin,
+        ymax,
     )
-    print("   Written: velocity_magnitude.vtk")
+    print("   Written: output/velocity_magnitude.vtk")
 
     # =================================================================
     # 3. Writing Vector Fields
@@ -153,9 +177,18 @@ def main():
 
     # Write velocity vector field
     cfd_python.write_vtk_vector(
-        "velocity.vtk", "velocity", fields["u"], fields["v"], nx, ny, xmin, xmax, ymin, ymax
+        os.path.join(output_dir, "velocity.vtk"),
+        "velocity",
+        fields["u"],
+        fields["v"],
+        nx,
+        ny,
+        xmin,
+        xmax,
+        ymin,
+        ymax,
     )
-    print("   Written: velocity.vtk")
+    print("   Written: output/velocity.vtk")
 
     # =================================================================
     # 4. Time Series Output
@@ -189,12 +222,12 @@ def main():
         vel_mag_frame = cfd_python.compute_velocity_magnitude(u_rot, v_rot, nx, ny)
 
         # Write with frame number in filename
-        filename = f"vortex_{frame:04d}.vtk"
+        filename = os.path.join(output_dir, f"vortex_{frame:04d}.vtk")
         cfd_python.write_vtk_scalar(
             filename, "velocity_magnitude", vel_mag_frame, nx, ny, xmin, xmax, ymin, ymax
         )
 
-    print(f"   Written: vortex_0000.vtk through vortex_{n_frames-1:04d}.vtk")
+    print(f"   Written: output/vortex_0000.vtk through output/vortex_{n_frames-1:04d}.vtk")
     print("   (Load in ParaView as a time series)")
 
     # =================================================================
@@ -204,20 +237,20 @@ def main():
     print("-" * 60)
 
     # Write velocity magnitude as CSV using Python
-    with open("velocity_magnitude.csv", "w") as f:
+    with open(os.path.join(output_dir, "velocity_magnitude.csv"), "w") as f:
         f.write("i,j,value\n")
         for j in range(ny):
             for i in range(nx):
                 f.write(f"{i},{j},{vel_mag[j * nx + i]}\n")
-    print("   Written: velocity_magnitude.csv")
+    print("   Written: output/velocity_magnitude.csv")
 
     # Write pressure as CSV
-    with open("pressure.csv", "w") as f:
+    with open(os.path.join(output_dir, "pressure.csv"), "w") as f:
         f.write("i,j,value\n")
         for j in range(ny):
             for i in range(nx):
                 f.write(f"{i},{j},{fields['pressure'][j * nx + i]}\n")
-    print("   Written: pressure.csv")
+    print("   Written: output/pressure.csv")
 
     # =================================================================
     # 6. Field Statistics
@@ -251,19 +284,19 @@ def main():
     print("\n" + "=" * 60)
     print("VTK Output Summary")
     print("-" * 60)
-    print(f"   Output directory: {output_dir}/")
+    print("   Output directory: output/")
     print("\n   Files created:")
     print("     Scalar fields:")
-    print("       - pressure.vtk")
-    print("       - temperature.vtk")
-    print("       - velocity_magnitude.vtk")
+    print("       - output/pressure.vtk")
+    print("       - output/temperature.vtk")
+    print("       - output/velocity_magnitude.vtk")
     print("     Vector fields:")
-    print("       - velocity.vtk")
+    print("       - output/velocity.vtk")
     print("     Time series:")
-    print(f"       - vortex_0000.vtk to vortex_{n_frames-1:04d}.vtk")
+    print(f"       - output/vortex_0000.vtk to output/vortex_{n_frames-1:04d}.vtk")
     print("     CSV files:")
-    print("       - velocity_magnitude.csv")
-    print("       - pressure.csv")
+    print("       - output/velocity_magnitude.csv")
+    print("       - output/pressure.csv")
     print("\n   To visualize:")
     print("     1. Open ParaView")
     print("     2. File -> Open -> Select VTK file")

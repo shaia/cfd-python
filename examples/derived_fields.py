@@ -26,6 +26,10 @@ def main():
     print("CFD Python Derived Fields Example")
     print("=" * 60)
 
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     # =================================================================
     # 1. Run a Simulation to Get Flow Fields
     # =================================================================
@@ -169,7 +173,7 @@ def main():
 
     # Write velocity magnitude
     cfd_python.write_vtk_scalar(
-        "velocity_magnitude.vtk",
+        os.path.join(output_dir, "velocity_magnitude.vtk"),
         "velocity_magnitude",
         vel_mag,
         nx,
@@ -179,11 +183,11 @@ def main():
         grid["ymin"],
         grid["ymax"],
     )
-    print("   Written: velocity_magnitude.vtk")
+    print("   Written: output/velocity_magnitude.vtk")
 
     # Write pressure
     cfd_python.write_vtk_scalar(
-        "pressure.vtk",
+        os.path.join(output_dir, "pressure.vtk"),
         "pressure",
         p,
         nx,
@@ -193,11 +197,11 @@ def main():
         grid["ymin"],
         grid["ymax"],
     )
-    print("   Written: pressure.vtk")
+    print("   Written: output/pressure.vtk")
 
     # Write velocity vectors
     cfd_python.write_vtk_vector(
-        "velocity_field.vtk",
+        os.path.join(output_dir, "velocity_field.vtk"),
         "velocity",
         u,
         v,
@@ -208,7 +212,7 @@ def main():
         grid["ymin"],
         grid["ymax"],
     )
-    print("   Written: velocity_field.vtk")
+    print("   Written: output/velocity_field.vtk")
 
     # =================================================================
     # Summary

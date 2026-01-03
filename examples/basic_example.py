@@ -27,6 +27,10 @@ def main():
     print("=" * 50)
     print(f"Version: {cfd_python.__version__}")
 
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     # Show available solvers
     print("\nAvailable Solvers:")
     for solver in cfd_python.list_solvers():
@@ -62,10 +66,9 @@ def main():
     print("2. Simulation with VTK Output")
     print("-" * 50)
 
-    vel_mag_vtk = cfd_python.run_simulation(
-        nx=nx, ny=ny, steps=steps, output_file="basic_output.vtk"
-    )
-    print(f"   Output: basic_output.vtk ({len(vel_mag_vtk)} points)")
+    output_file = os.path.join(output_dir, "basic_output.vtk")
+    vel_mag_vtk = cfd_python.run_simulation(nx=nx, ny=ny, steps=steps, output_file=output_file)
+    print(f"   Output: output/basic_output.vtk ({len(vel_mag_vtk)} points)")
 
     # Method 3: Using run_simulation_with_params
     print("\n" + "-" * 50)

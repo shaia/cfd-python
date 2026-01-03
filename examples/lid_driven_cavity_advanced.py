@@ -84,7 +84,7 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
     print(f"dx={dx:.4f}, dy={dy:.4f}, dt={dt:.6f}")
 
     # Set up output directory
-    output_dir = "cavity_output"
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
     os.makedirs(output_dir, exist_ok=True)
     cfd_python.set_output_dir(output_dir)
 
@@ -141,13 +141,13 @@ def run_cavity_simulation(nx=32, ny=32, Re=100, steps=500, output_interval=100):
 
         # Write VTK output
         if step % output_interval == 0 or step == steps - 1:
-            filename = f"cavity_step_{step:05d}.vtk"
+            filename = os.path.join(output_dir, f"cavity_step_{step:05d}.vtk")
             cfd_python.write_vtk_scalar(
                 filename, "velocity_magnitude", vel_mag, nx, ny, xmin, xmax, ymin, ymax
             )
 
     print("\nSimulation complete!")
-    print(f"Output files written to: {output_dir}/")
+    print("Output files written to: output/")
 
     # Final statistics
     final_stats = cfd_python.calculate_field_stats(vel_mag)
@@ -191,7 +191,7 @@ def analyze_results(results):
         else:
             print("  Status: NOT CONVERGED (may need more steps)")
 
-    print(f"\nOutput directory: {results['output_dir']}")
+    print("\nOutput directory: output/")
 
 
 def main():
