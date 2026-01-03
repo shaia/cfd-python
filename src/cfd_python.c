@@ -1235,8 +1235,8 @@ static PyObject* create_grid_stretched_py(PyObject* self, PyObject* args) {
         }
     }
 
-    if (PyDict_SetItemString(grid_dict, "x", x_list) < 0 ||
-        PyDict_SetItemString(grid_dict, "y", y_list) < 0) {
+    if (PyDict_SetItemString(grid_dict, "x_coords", x_list) < 0 ||
+        PyDict_SetItemString(grid_dict, "y_coords", y_list) < 0) {
         Py_DECREF(x_list);
         Py_DECREF(y_list);
         Py_DECREF(grid_dict);

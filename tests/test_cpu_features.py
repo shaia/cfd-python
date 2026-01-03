@@ -185,27 +185,27 @@ class TestCreateGridStretched:
         """Test stretched grid has coordinate lists"""
         grid = cfd_python.create_grid_stretched(5, 6, 0.0, 1.0, 0.0, 2.0, 1.5)
 
-        assert "x" in grid
-        assert "y" in grid
-        assert isinstance(grid["x"], list)
-        assert isinstance(grid["y"], list)
-        assert len(grid["x"]) == 5
-        assert len(grid["y"]) == 6
+        assert "x_coords" in grid
+        assert "y_coords" in grid
+        assert isinstance(grid["x_coords"], list)
+        assert isinstance(grid["y_coords"], list)
+        assert len(grid["x_coords"]) == 5
+        assert len(grid["y_coords"]) == 6
 
     def test_create_grid_stretched_spans_domain(self):
         """Test stretched grid spans full domain [xmin, xmax]"""
         grid = cfd_python.create_grid_stretched(10, 10, 0.0, 1.0, -1.0, 1.0, 2.0)
 
         # First point should be at xmin, last point at xmax
-        assert abs(grid["x"][0] - grid["xmin"]) < 1e-10
-        assert abs(grid["x"][-1] - grid["xmax"]) < 1e-10
-        assert abs(grid["y"][0] - grid["ymin"]) < 1e-10
-        assert abs(grid["y"][-1] - grid["ymax"]) < 1e-10
+        assert abs(grid["x_coords"][0] - grid["xmin"]) < 1e-10
+        assert abs(grid["x_coords"][-1] - grid["xmax"]) < 1e-10
+        assert abs(grid["y_coords"][0] - grid["ymin"]) < 1e-10
+        assert abs(grid["y_coords"][-1] - grid["ymax"]) < 1e-10
 
         # All points should be within bounds
-        for x in grid["x"]:
+        for x in grid["x_coords"]:
             assert grid["xmin"] - 1e-10 <= x <= grid["xmax"] + 1e-10
-        for y in grid["y"]:
+        for y in grid["y_coords"]:
             assert grid["ymin"] - 1e-10 <= y <= grid["ymax"] + 1e-10
 
     def test_create_grid_stretched_higher_beta_clusters_at_boundaries(self):
@@ -214,9 +214,9 @@ class TestCreateGridStretched:
         grid_high = cfd_python.create_grid_stretched(11, 11, 0.0, 1.0, 0.0, 1.0, 3.0)
 
         # With higher beta, spacing near boundaries should be smaller
-        # Compare first cell size (x[1] - x[0])
-        dx_first_low = grid_low["x"][1] - grid_low["x"][0]
-        dx_first_high = grid_high["x"][1] - grid_high["x"][0]
+        # Compare first cell size (x_coords[1] - x_coords[0])
+        dx_first_low = grid_low["x_coords"][1] - grid_low["x_coords"][0]
+        dx_first_high = grid_high["x_coords"][1] - grid_high["x_coords"][0]
 
         # Higher beta = smaller cells near boundaries
         assert dx_first_high < dx_first_low
