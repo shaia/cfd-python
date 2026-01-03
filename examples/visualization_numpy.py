@@ -7,6 +7,34 @@ analysis and visualization preparation.
 
 Note: This example uses only NumPy. For actual plotting,
 you would use matplotlib (see visualization_matplotlib.py).
+
+NumPy for CFD Post-Processing:
+------------------------------
+NumPy is essential for CFD analysis because:
+
+1. Array Operations:
+   - Simulation returns flat lists; reshape to 2D grids for spatial analysis
+   - Vectorized operations are much faster than Python loops
+   - Example: vel_mag = np.sqrt(u**2 + v**2)  # computes for all points at once
+
+2. Statistical Analysis:
+   - np.min/max/mean/std: Basic field statistics
+   - np.percentile: Distribution analysis (e.g., 99th percentile for outliers)
+   - Spatial statistics: centerlines, profiles, quadrant analysis
+
+3. Gradient Computation:
+   - np.gradient: Numerical derivatives for vorticity, strain rate
+   - Identifies regions of high shear, flow separation
+
+4. Data Export:
+   - np.savetxt: Export to CSV for external tools (Excel, MATLAB)
+   - np.save/load: Binary format for large datasets
+
+5. Meshgrid for Visualization:
+   - np.meshgrid: Create X, Y coordinate arrays for contour plots
+   - Pairs spatial coordinates with field values
+
+This example shows common analysis patterns used in CFD workflows.
 """
 
 import os
@@ -22,6 +50,10 @@ import cfd_python
 def main():
     print("CFD Python - NumPy Analysis Example")
     print("=" * 50)
+
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
 
     # Run simulation
     nx, ny = 30, 30
@@ -124,10 +156,10 @@ def main():
     print("-" * 50)
 
     # Save as CSV for external tools
-    output_file = "velocity_data.csv"
+    output_file = os.path.join(output_dir, "velocity_data.csv")
     flat_data = np.column_stack([X.flatten(), Y.flatten(), vel_mag.flatten()])
     np.savetxt(output_file, flat_data, delimiter=",", header="x,y,velocity_magnitude", comments="")
-    print(f"   Saved to: {output_file}")
+    print("   Saved to: output/velocity_data.csv")
     print(f"   Shape: {flat_data.shape}")
 
     print("\n" + "=" * 50)

@@ -154,6 +154,10 @@ src/cfd_lib/
 *.vtu
 *.pvd
 
+# Example output files
+examples/output/
+*.csv
+
 # IDE
 .vscode/
 .idea/

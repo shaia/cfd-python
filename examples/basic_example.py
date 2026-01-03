@@ -4,6 +4,15 @@ Basic CFD Python Example
 
 This example demonstrates the fundamental usage of the CFD Python bindings
 for running fluid dynamics simulations.
+
+CFD (Computational Fluid Dynamics) simulates fluid flow by solving the
+Navier-Stokes equations on a discrete grid. Key concepts:
+
+- Grid: The computational domain is divided into nx × ny cells
+- Time stepping: The simulation advances in discrete time steps (dt)
+- CFL number: Courant-Friedrichs-Lewy condition ensures numerical stability
+  (CFL = u*dt/dx, typically kept < 1 for explicit methods)
+- Velocity magnitude: sqrt(u² + v²) where u,v are velocity components
 """
 
 import os
@@ -27,6 +36,10 @@ def main():
     print("=" * 50)
     print(f"Version: {cfd_python.__version__}")
 
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     # Show available solvers
     print("\nAvailable Solvers:")
     for solver in cfd_python.list_solvers():
@@ -44,6 +57,9 @@ def main():
     print(f"  Steps: {steps}")
 
     # Method 1: Simple simulation
+    # run_simulation() is the simplest API - just specify grid size and steps.
+    # It uses default boundary conditions (lid-driven cavity: moving top wall)
+    # and returns velocity magnitude at each grid point.
     print("\n" + "-" * 50)
     print("1. Simple Simulation (run_simulation)")
     print("-" * 50)
@@ -58,16 +74,22 @@ def main():
     print(f"   Mean velocity: {np.mean(vel_array):.6f}")
 
     # Method 2: With VTK output
+    # VTK (Visualization Toolkit) format is widely used for scientific visualization.
+    # The output file can be opened in ParaView, VisIt, or other VTK-compatible tools
+    # to visualize the flow field in 2D/3D with contours, vectors, streamlines, etc.
     print("\n" + "-" * 50)
     print("2. Simulation with VTK Output")
     print("-" * 50)
 
-    vel_mag_vtk = cfd_python.run_simulation(
-        nx=nx, ny=ny, steps=steps, output_file="basic_output.vtk"
-    )
-    print(f"   Output: basic_output.vtk ({len(vel_mag_vtk)} points)")
+    output_file = os.path.join(output_dir, "basic_output.vtk")
+    vel_mag_vtk = cfd_python.run_simulation(nx=nx, ny=ny, steps=steps, output_file=output_file)
+    print(f"   Output: output/basic_output.vtk ({len(vel_mag_vtk)} points)")
 
     # Method 3: Using run_simulation_with_params
+    # This API gives more control over simulation parameters:
+    # - dt: Time step size (smaller = more accurate but slower)
+    # - cfl: CFL number for stability (typically 0.1-0.5 for explicit methods)
+    # Returns a dict with results and metadata including solver info.
     print("\n" + "-" * 50)
     print("3. Custom Parameters (run_simulation_with_params)")
     print("-" * 50)
@@ -83,6 +105,9 @@ def main():
         print(f"   Iterations: {stats.get('iterations', 'N/A')}")
 
     # Method 4: Grid and parameter inspection
+    # create_grid() generates the computational mesh with coordinates.
+    # get_default_solver_params() shows the default numerical parameters.
+    # These are useful for setting up custom simulations or post-processing.
     print("\n" + "-" * 50)
     print("4. Grid and Parameter Inspection")
     print("-" * 50)
