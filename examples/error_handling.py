@@ -187,19 +187,19 @@ def main():
 
     # CFDMemoryError can be caught as MemoryError
     try:
-        raise cfd_python.CFDMemoryError(-2, "Out of memory during grid allocation")
+        raise cfd_python.CFDMemoryError("Out of memory during grid allocation", -2)
     except MemoryError as e:
         print(f"     Caught as MemoryError: {e}")
 
     # CFDInvalidError can be caught as ValueError
     try:
-        raise cfd_python.CFDInvalidError(-3, "Invalid grid dimensions")
+        raise cfd_python.CFDInvalidError("Invalid grid dimensions", -3)
     except ValueError as e:
         print(f"     Caught as ValueError: {e}")
 
     # CFDIOError can be caught as OSError (IOError is an alias in Python 3)
     try:
-        raise cfd_python.CFDIOError(-4, "Cannot write to output file")
+        raise cfd_python.CFDIOError("Cannot write to output file", -4)
     except OSError as e:
         print(f"     Caught as OSError: {e}")
 
