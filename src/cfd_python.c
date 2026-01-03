@@ -2475,8 +2475,10 @@ static PyMethodDef cfd_python_methods[] = {
     // Grid Initialization Variants (Phase 6)
     {"create_grid_stretched", create_grid_stretched_py, METH_VARARGS,
      "Create a grid with stretched (non-uniform) spacing.\n\n"
-     "Uses hyperbolic cosine stretching to cluster points near boundaries.\n"
-     "Larger beta values create more stretching.\n\n"
+     "WARNING: The current implementation has a known bug. The cosh-based formula\n"
+     "clusters points toward the CENTER of the domain (not boundaries) and does not\n"
+     "span the full domain [xmin, xmax]. Both endpoints map to xmin.\n"
+     "See cfd-workspace/cfd/ROADMAP.md 'Known Issues' for details and fix status.\n\n"
      "Args:\n"
      "    nx (int): Grid points in x direction\n"
      "    ny (int): Grid points in y direction\n"
@@ -2486,7 +2488,8 @@ static PyMethodDef cfd_python_methods[] = {
      "    ymax (float): Maximum y coordinate\n"
      "    beta (float): Stretching factor (> 0, typically 1.0-3.0)\n\n"
      "Returns:\n"
-     "    dict: Grid info with 'nx', 'ny', 'x', 'y', 'xmin', 'xmax', 'ymin', 'ymax', 'beta'"},
+     "    dict: Grid info with 'nx', 'ny', 'x_coords', 'y_coords', 'xmin', 'xmax',\n"
+     "          'ymin', 'ymax', 'beta'"},
     {NULL, NULL, 0, NULL}
 };
 

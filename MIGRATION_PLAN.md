@@ -628,15 +628,11 @@ find_library(CFD_LIBRARY cfd_library)  # Unified library name
 
 ### ⚠️ Areas for Improvement
 
-**1. Inconsistent Coordinate Naming**
+**1. ~~Inconsistent Coordinate Naming~~ (FIXED)**
 ```python
-# create_grid returns:
-grid["x_coords"], grid["y_coords"]  # with "_coords" suffix
-
-# create_grid_stretched returns:
-grid["x"], grid["y"]  # without suffix
+# Both functions now return consistent keys:
+grid["x_coords"], grid["y_coords"]  # standardized naming
 ```
-Consider standardizing on one convention.
 
 **2. Mixed Paradigms for Complex Operations**
 ```python
