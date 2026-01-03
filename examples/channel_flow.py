@@ -121,10 +121,10 @@ def main():
 
     # Set up flow - demonstrates how to configure boundary conditions
     # Note: setup_channel_flow shows BC API usage; run_simulation_with_params
-    # creates its own internal fields. The u, v, p here are used to verify
-    # the BC setup and for comparison with analytical solutions.
+    # creates its own internal fields. The u, v here are used to verify
+    # the BC setup (inlet profile, cross-section profiles).
     print("\nSetting up channel flow (BC demonstration)...")
-    u, v, p = setup_channel_flow(nx, ny, u_max)
+    u, v, _ = setup_channel_flow(nx, ny, u_max)
 
     # Verify inlet profile (parabolic velocity distribution)
     print("\nInlet velocity profile (left edge):")
@@ -146,15 +146,15 @@ def main():
     print(f"  Completed {steps} steps")
     print(f"  Solver: {result['solver_name']}")
 
-    # Compute statistics
+    # Compute statistics from simulation result
     vel_mag = result["velocity_magnitude"]
-    flow_stats = cfd_python.compute_flow_statistics(u, v, p, nx, ny)
+    vel_mag_stats = cfd_python.calculate_field_stats(vel_mag)
 
-    print("\nFlow Statistics:")
+    print("\nSimulation Results:")
     print("  Velocity magnitude:")
-    print(f"    Min: {flow_stats['velocity_magnitude']['min']:.6f}")
-    print(f"    Max: {flow_stats['velocity_magnitude']['max']:.6f}")
-    print(f"    Avg: {flow_stats['velocity_magnitude']['avg']:.6f}")
+    print(f"    Min: {vel_mag_stats['min']:.6f}")
+    print(f"    Max: {vel_mag_stats['max']:.6f}")
+    print(f"    Avg: {vel_mag_stats['avg']:.6f}")
 
     # Check centerline velocity
     centerline_velocities = []
@@ -173,7 +173,7 @@ def main():
     u_analytical = compute_analytical_solution(nx, ny, u_max, ymax - ymin)
     u_analytical_stats = cfd_python.calculate_field_stats(u_analytical)
     print(f"  Analytical max velocity: {u_analytical_stats['max']:.6f}")
-    print(f"  Simulated max velocity:  {flow_stats['velocity_magnitude']['max']:.6f}")
+    print(f"  Simulated max velocity:  {vel_mag_stats['max']:.6f}")
 
     # Write output
     print("\nWriting VTK output...")
