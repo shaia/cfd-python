@@ -71,9 +71,13 @@ def compute_analytical_solution(nx, ny, u_max, H):
     For Poiseuille flow, the velocity profile is parabolic:
     u(y) = u_max * 4 * (y/H) * (1 - y/H)
 
+    The factor of 4 ensures that u_max occurs at the centerline (y = H/2),
+    where the formula evaluates to u_max * 4 * 0.5 * 0.5 = u_max.
+    At the walls (y = 0 and y = H), velocity is zero (no-slip condition).
+
     Args:
         nx, ny: Grid dimensions
-        u_max: Maximum centerline velocity
+        u_max: Maximum velocity at the channel centerline (y = H/2)
         H: Channel height
 
     Returns:
