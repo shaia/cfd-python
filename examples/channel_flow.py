@@ -46,8 +46,9 @@ def setup_channel_flow(nx, ny, u_max=1.0):
     # Apply outlet BC (zero-gradient on right edge)
     cfd_python.bc_apply_outlet_velocity(u, v, nx, ny, cfd_python.BC_EDGE_RIGHT)
 
-    # Apply no-slip walls on top and bottom
-    # Note: bc_apply_noslip applies to all boundaries, so we apply walls specifically
+    # Apply no-slip walls on top and bottom manually.
+    # We don't use bc_apply_noslip() (no-slip) here because it applies to all boundaries,
+    # which would overwrite the inlet/outlet conditions we just set.
     for i in range(nx):
         # Bottom wall (j=0)
         idx_bottom = i
