@@ -34,7 +34,7 @@ This directory contains example scripts demonstrating how to use the CFD Python 
 | [output_formats.py](output_formats.py) | Exporting to VTK and CSV formats |
 | [vtk_output.py](vtk_output.py) | VTK output for ParaView visualization |
 | [visualization_numpy.py](visualization_numpy.py) | NumPy analysis of simulation results |
-| [visualization_matplotlib.py](visualization_matplotlib.py) | Matplotlib plots (contours, vectors, streamlines) |
+| [visualization_matplotlib.py](visualization_matplotlib.py) | Matplotlib plots (contours, vectors, streamlines, 3D Rankine vortex) |
 
 ### Derived Fields
 

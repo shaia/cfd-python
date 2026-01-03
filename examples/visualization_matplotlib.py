@@ -29,7 +29,24 @@ except ImportError as e:
 
 
 def create_vortex_field(nx, ny, xmin, xmax, ymin, ymax):
-    """Create a synthetic vortex velocity field for visualization."""
+    """Create a synthetic Rankine vortex velocity field for visualization.
+
+    The Rankine vortex is a classical fluid dynamics model combining:
+    - Solid body rotation inside the core (r < core_radius): velocity ~ r
+    - Irrotational (potential) flow outside (r > core_radius): velocity ~ 1/r
+
+    This produces the characteristic "volcano" shape in 3D plots:
+    - Zero velocity at the center (fluid rotates around, not through the axis)
+    - Maximum velocity at the core boundary (r = core_radius)
+    - Decay toward outer edges following 1/r
+
+    Args:
+        nx, ny: Grid dimensions
+        xmin, xmax, ymin, ymax: Domain bounds
+
+    Returns:
+        tuple: (u, v, p) - x-velocity, y-velocity, and pressure fields
+    """
     dx = (xmax - xmin) / (nx - 1)
     dy = (ymax - ymin) / (ny - 1)
     xc, yc = (xmax + xmin) / 2, (ymax + ymin) / 2
@@ -47,16 +64,20 @@ def create_vortex_field(nx, ny, xmin, xmax, ymin, ymax):
             rx, ry = x - xc, y - yc
             r = np.sqrt(rx * rx + ry * ry) + 1e-10
 
-            # Rankine vortex
+            # Rankine vortex velocity profile
             core_radius = 0.3
             strength = 1.0
             if r < core_radius:
+                # Inside core: solid body rotation (v ~ r)
                 factor = r / core_radius
             else:
+                # Outside core: irrotational flow (v ~ 1/r)
                 factor = core_radius / r
 
+            # Tangential velocity components (perpendicular to radius)
             u[idx] = -ry / r * strength * factor
             v[idx] = rx / r * strength * factor
+            # Pressure from Bernoulli (lower in high-velocity regions)
             p[idx] = 1.0 - 0.5 * (strength * factor) ** 2
 
     return u, v, p
@@ -311,10 +332,20 @@ def main():
     print("   Saved: output/grid_comparison.png")
 
     # =================================================================
-    # 7. 3D Surface Plot
+    # 7. 3D Surface Plot (Rankine Vortex)
     # =================================================================
     print("\n7. Creating 3D Surface Plot")
     print("-" * 60)
+
+    # This plot visualizes a Rankine vortex velocity field:
+    # - The "volcano" shape shows velocity magnitude vs position
+    # - Center dip: zero velocity at vortex core (fluid rotates around, not through)
+    # - Peak ring: maximum velocity at core radius boundary (r = 0.3)
+    # - Outer decay: velocity decreases as 1/r outside the core
+    #
+    # Rankine vortex combines:
+    # - Solid body rotation inside core (v ~ r)
+    # - Irrotational flow outside core (v ~ 1/r)
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
@@ -324,11 +355,12 @@ def main():
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Velocity Magnitude")
-    ax.set_title("3D Velocity Magnitude Surface")
+    ax.set_title("3D Velocity Magnitude Surface (Rankine Vortex)")
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10, label="Velocity")
     plt.savefig(os.path.join(output_dir, "velocity_surface_3d.png"), dpi=150, bbox_inches="tight")
     plt.close()
     print("   Saved: output/velocity_surface_3d.png")
+    print("   Note: Shows Rankine vortex - peak velocity ring around core, decay at edges")
 
     # =================================================================
     # Summary
