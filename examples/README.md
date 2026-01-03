@@ -10,6 +10,8 @@ This directory contains example scripts demonstrating how to use the CFD Python 
 |---------|-------------|
 | [basic_example.py](basic_example.py) | Fundamental usage of all main functions |
 | [solver_discovery.py](solver_discovery.py) | Discovering and using different solvers |
+| [solver_comparison.py](solver_comparison.py) | Comparing different solver implementations |
+| [backend_detection.py](backend_detection.py) | Detecting SIMD/OpenMP/CUDA backend availability |
 | [error_handling.py](error_handling.py) | Error handling API with exceptions |
 
 ### Simulation Examples
