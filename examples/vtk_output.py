@@ -203,12 +203,20 @@ def main():
     print("\n5. CSV Output for Analysis")
     print("-" * 60)
 
-    # Write velocity magnitude as CSV
-    cfd_python.write_csv_field("velocity_magnitude.csv", vel_mag, nx, ny)
+    # Write velocity magnitude as CSV using Python
+    with open("velocity_magnitude.csv", "w") as f:
+        f.write("i,j,value\n")
+        for j in range(ny):
+            for i in range(nx):
+                f.write(f"{i},{j},{vel_mag[j * nx + i]}\n")
     print("   Written: velocity_magnitude.csv")
 
     # Write pressure as CSV
-    cfd_python.write_csv_field("pressure.csv", fields["pressure"], nx, ny)
+    with open("pressure.csv", "w") as f:
+        f.write("i,j,value\n")
+        for j in range(ny):
+            for i in range(nx):
+                f.write(f"{i},{j},{fields['pressure'][j * nx + i]}\n")
     print("   Written: pressure.csv")
 
     # =================================================================
@@ -235,7 +243,7 @@ def main():
         fields["u"], fields["v"], fields["pressure"], nx, ny
     )
     print(f"     Velocity magnitude max: {flow_stats['velocity_magnitude']['max']:.4f}")
-    print(f"     Pressure max: {flow_stats['pressure']['max']:.4f}")
+    print(f"     Pressure max: {flow_stats['p']['max']:.4f}")
 
     # =================================================================
     # Summary

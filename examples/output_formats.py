@@ -115,7 +115,10 @@ def main():
             create_new=False,
         )
     print("   Appended 5 timesteps")
-    print(f"   Final size: {csv_file.stat().st_size} bytes")
+    if csv_file.exists():
+        print(f"   Final size: {csv_file.stat().st_size} bytes")
+    else:
+        print("   Note: CSV file created in current working directory")
 
     # Output Type Constants
     print("\n5. Output Type Constants")

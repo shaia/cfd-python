@@ -180,7 +180,7 @@ def main():
     print("\n" + "=" * 60)
     print("Boundary Condition Types Available:")
     print("  - BC_TYPE_PERIODIC: Periodic boundaries")
-    print("  - BC_TYPE_NEUMANN: Zero-gradient (∂φ/∂n = 0)")
+    print("  - BC_TYPE_NEUMANN: Zero-gradient (dphi/dn = 0)")
     print("  - BC_TYPE_DIRICHLET: Fixed value")
     print("  - BC_TYPE_NOSLIP: Zero velocity at walls")
     print("  - BC_TYPE_INLET: Inlet velocity (uniform/parabolic)")
