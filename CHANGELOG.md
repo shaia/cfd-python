@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-01-03
+
 ### Added
 
 #### Backend Availability API (Phase 5)
@@ -46,15 +48,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Documentation & Examples (Phase 7)
 
 - Comprehensive README with full API reference
-- New example scripts demonstrating cfd_python features:
-  - `lid_driven_cavity_advanced.py`: Complete cavity simulation with convergence monitoring
-  - `channel_flow.py`: Channel flow with parabolic inlet and analytical validation
+- 15 example scripts demonstrating cfd_python features:
+  - `basic_example.py`: Fundamental usage of all main functions with CFD concepts
+  - `lid_driven_cavity.py`: Classic CFD benchmark problem
+  - `lid_driven_cavity_advanced.py`: Cavity simulation with convergence monitoring
+  - `channel_flow.py`: Poiseuille flow with parabolic inlet and analytical validation
+  - `parameter_study.py`: Running parameter studies and comparisons
   - `vtk_output.py`: VTK output for ParaView visualization
+  - `output_formats.py`: Exporting to VTK and CSV formats
+  - `visualization_numpy.py`: NumPy analysis of simulation results
+  - `visualization_matplotlib.py`: Matplotlib plots (contours, vectors, streamlines, 3D Rankine vortex)
+  - `solver_discovery.py`: Discovering and using different solvers
   - `solver_comparison.py`: Backend performance comparison and benchmarking
   - `backend_detection.py`: CPU feature and backend availability detection
   - `boundary_conditions.py`: Boundary condition API usage patterns
   - `derived_fields.py`: Computing velocity magnitude and flow statistics
   - `error_handling.py`: Error handling best practices
+- Physics explanations in all examples (Navier-Stokes, CFL condition, Reynolds number, etc.)
+- All examples write output to `examples/output/` directory (gitignored)
 - New test suites:
   - `test_backend_availability.py` - Backend constants and functions
   - `test_derived_fields.py` - Statistics and velocity magnitude
@@ -63,18 +74,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_abi_compatibility.py` - NULL handling and stress tests
 
 ### Changed
+
 - Updated build system to link modular CFD libraries (cfd_api, cfd_core, cfd_scalar, cfd_simd, cfd_omp, cfd_cuda)
 - Migrated to CUDA 12.0.0 from 12.6.2 for better stability and compatibility
 - Switched from `uv pip` to standard `pip` for wheel installation in CI tests
 - Updated CMakeLists.txt to use GNU linker groups on Linux for circular dependency resolution
+- Example output files now written to dedicated `examples/output/` subdirectory
 
 ### Fixed
+
 - CMake library detection for CFD v0.1.6 static builds
 - Wheel installation compatibility with Python stable ABI (abi3) wheels
 - Removed non-standard wheel filename modifications for PEP 427 compliance
 - CUDA toolkit installation by installing GCC 11 before CUDA on Linux
 - Simplified CUDA toolkit installation by removing sub-packages parameter
 - Test code style: moved pytest imports to module level for consistency
+- Lid-driven cavity example convergence tracking now shows meaningful evolution
+- Exception constructor parameter order in error_handling.py example
+- Cross-platform compatibility for all example scripts
 
 ## [0.1.0] - 2025-12-26
 
