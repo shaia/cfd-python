@@ -142,11 +142,11 @@ class TestHasSIMD:
 
 # BUG: The stretched grid formula in the C library is incorrect.
 # The cosh-based formula clusters points toward the center and doesn't span [xmin, xmax].
-# See: cfd/ROADMAP.md "Known Issues > Stretched Grid Formula Bug"
+# See: ../cfd/ROADMAP.md "Known Issues > Stretched Grid Formula Bug"
 # These tests are skipped until the C library fix is applied.
 STRETCHED_GRID_BUG_REASON = (
     "Stretched grid formula bug: grid does not span [xmin, xmax]. "
-    "See cfd/ROADMAP.md 'Known Issues' section."
+    "See cfd-workspace/cfd/ROADMAP.md 'Known Issues' section."
 )
 
 
