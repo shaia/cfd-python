@@ -27,29 +27,6 @@ except ImportError as e:
     sys.exit(1)
 
 
-def create_parabolic_profile(ny, u_max):
-    """Create a parabolic velocity profile for channel flow.
-
-    For Poiseuille flow: u(y) = u_max * (1 - (2y/H - 1)^2)
-    where H is the channel height.
-
-    Args:
-        ny: Number of grid points in y-direction
-        u_max: Maximum centerline velocity
-
-    Returns:
-        list: Velocity values at each y-position
-    """
-    profile = []
-    for j in range(ny):
-        # Normalized y-coordinate: 0 at bottom, 1 at top
-        y_norm = j / (ny - 1)
-        # Parabolic profile: max at center (y=0.5), zero at walls
-        u = u_max * 4.0 * y_norm * (1.0 - y_norm)
-        profile.append(u)
-    return profile
-
-
 def setup_channel_flow(nx, ny, u_max=1.0):
     """Set up initial conditions for channel flow.
 
@@ -89,23 +66,22 @@ def setup_channel_flow(nx, ny, u_max=1.0):
     return u, v, p
 
 
-def compute_analytical_solution(nx, ny, u_max, dp_dx, mu, H):
-    """Compute analytical Poiseuille flow solution.
+def compute_analytical_solution(nx, ny, u_max, H):
+    """Compute analytical Poiseuille flow solution for validation.
 
-    For fully developed channel flow:
-    u(y) = (1/2mu) * (-dp/dx) * y * (H - y)
+    This is a reference implementation for comparing simulation results
+    against the known analytical solution for fully developed channel flow.
 
-    With u_max = (1/8mu) * (-dp/dx) * H^2
+    For Poiseuille flow, the velocity profile is parabolic:
+    u(y) = u_max * 4 * (y/H) * (1 - y/H)
 
     Args:
         nx, ny: Grid dimensions
         u_max: Maximum centerline velocity
-        dp_dx: Pressure gradient
-        mu: Dynamic viscosity
         H: Channel height
 
     Returns:
-        list: Analytical velocity field
+        list: Analytical velocity field for comparison with simulation
     """
     u_analytical = [0.0] * (nx * ny)
     dy = H / (ny - 1)
@@ -191,7 +167,7 @@ def main():
 
     # Compare with analytical solution
     print("\nAnalytical Comparison:")
-    u_analytical = compute_analytical_solution(nx, ny, u_max, 0, 1, ymax - ymin)
+    u_analytical = compute_analytical_solution(nx, ny, u_max, ymax - ymin)
     u_analytical_stats = cfd_python.calculate_field_stats(u_analytical)
     print(f"  Analytical max velocity: {u_analytical_stats['max']:.6f}")
     print(f"  Simulated max velocity:  {flow_stats['velocity_magnitude']['max']:.6f}")
