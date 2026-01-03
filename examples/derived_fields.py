@@ -4,6 +4,31 @@ Derived Fields and Statistics Example
 
 This example demonstrates how to compute derived quantities and statistics
 from flow fields using cfd_python.
+
+Derived Fields in CFD:
+----------------------
+Raw simulation outputs are typically velocity components (u, v) and pressure (p).
+From these, we compute derived quantities for analysis:
+
+1. Velocity Magnitude: |V| = sqrt(u² + v²)
+   - Shows flow speed regardless of direction
+   - Useful for identifying high-speed regions, jets, wakes
+
+2. Field Statistics (min, max, avg, sum):
+   - Monitor simulation health (unbounded values indicate instability)
+   - Track convergence (values should stabilize over time)
+   - Validate against expected physical behavior
+
+3. Vorticity: ω = ∂v/∂x - ∂u/∂y
+   - Measures local rotation in the flow
+   - Identifies vortices and shear layers
+
+4. Kinetic Energy: KE = 0.5 * ρ * (u² + v²)
+   - Total energy in the flow
+   - Should be conserved or decay (not grow) for physical solutions
+
+These post-processing tools are essential for validating simulations and
+extracting meaningful physical insights from the raw data.
 """
 
 import os

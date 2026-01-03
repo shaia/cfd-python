@@ -7,6 +7,34 @@ analysis and visualization preparation.
 
 Note: This example uses only NumPy. For actual plotting,
 you would use matplotlib (see visualization_matplotlib.py).
+
+NumPy for CFD Post-Processing:
+------------------------------
+NumPy is essential for CFD analysis because:
+
+1. Array Operations:
+   - Simulation returns flat lists; reshape to 2D grids for spatial analysis
+   - Vectorized operations are much faster than Python loops
+   - Example: vel_mag = np.sqrt(u**2 + v**2)  # computes for all points at once
+
+2. Statistical Analysis:
+   - np.min/max/mean/std: Basic field statistics
+   - np.percentile: Distribution analysis (e.g., 99th percentile for outliers)
+   - Spatial statistics: centerlines, profiles, quadrant analysis
+
+3. Gradient Computation:
+   - np.gradient: Numerical derivatives for vorticity, strain rate
+   - Identifies regions of high shear, flow separation
+
+4. Data Export:
+   - np.savetxt: Export to CSV for external tools (Excel, MATLAB)
+   - np.save/load: Binary format for large datasets
+
+5. Meshgrid for Visualization:
+   - np.meshgrid: Create X, Y coordinate arrays for contour plots
+   - Pairs spatial coordinates with field values
+
+This example shows common analysis patterns used in CFD workflows.
 """
 
 import os

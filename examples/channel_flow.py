@@ -7,6 +7,25 @@ This example demonstrates setting up a channel flow simulation with:
 - Zero-gradient outlet
 - No-slip walls on top and bottom
 - Periodic or developed flow analysis
+
+Physics Background:
+-------------------
+Channel flow (Poiseuille flow) is fluid flow between two parallel plates driven
+by a pressure gradient. Key characteristics:
+
+1. Parabolic velocity profile: Due to viscosity, fluid at the walls has zero
+   velocity (no-slip), while maximum velocity occurs at the centerline.
+   u(y) = u_max * 4 * (y/H) * (1 - y/H)
+
+2. Fully developed flow: After sufficient distance from the inlet, the velocity
+   profile becomes invariant along the flow direction (du/dx = 0).
+
+3. Boundary conditions:
+   - Inlet: Prescribed velocity (parabolic profile for developed flow)
+   - Outlet: Zero-gradient (Neumann BC) allows flow to exit freely
+   - Walls: No-slip condition (velocity = 0 at solid surfaces)
+
+This is a fundamental CFD validation case with known analytical solutions.
 """
 
 import os

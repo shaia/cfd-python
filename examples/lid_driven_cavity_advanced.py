@@ -7,6 +7,32 @@ This example demonstrates a complete lid-driven cavity simulation with:
 - Time stepping with convergence monitoring
 - Post-processing and visualization output
 - Statistics tracking
+
+Physics Background:
+-------------------
+The lid-driven cavity is a fundamental CFD benchmark problem. A square (or
+rectangular) cavity has:
+- Three stationary walls (no-slip: u = v = 0)
+- One moving wall (lid) with prescribed velocity (u = U_lid, v = 0)
+
+The moving lid drags fluid along, creating:
+1. A primary vortex in the center rotating with the lid
+2. Secondary corner vortices at low Reynolds numbers
+3. Complex vortex structures at high Reynolds numbers
+
+Reynolds Number (Re):
+Re = U_lid * L / ν  where L is cavity size, ν is kinematic viscosity
+
+- Re < 100: Single primary vortex, steady flow
+- Re ~ 1000: Secondary vortices appear in corners
+- Re > 3000: Flow becomes unsteady, then turbulent
+
+Numerical Considerations:
+- Time step limited by CFL condition (advection) and diffusion stability
+- Grid resolution affects vortex capture and accuracy
+- Convergence monitored by velocity change between steps
+
+This is the standard validation case for incompressible Navier-Stokes solvers.
 """
 
 import os

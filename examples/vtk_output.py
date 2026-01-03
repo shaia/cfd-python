@@ -5,12 +5,34 @@ VTK Output Example
 This example demonstrates the VTK output capabilities of cfd_python for
 visualizing simulation results in ParaView or other VTK-compatible tools.
 
-VTK (Visualization Toolkit) format is widely used for scientific visualization.
-This example shows how to:
-- Write scalar fields (pressure, temperature, velocity magnitude)
-- Write vector fields (velocity, vorticity)
-- Create time series output for animations
-- Configure output directories
+VTK (Visualization Toolkit) Format:
+-----------------------------------
+VTK is the standard format for scientific visualization. Key concepts:
+
+1. File Types:
+   - .vtk (legacy format): Simple ASCII/binary, widely supported
+   - .vtu (XML format): More features, better for large datasets
+   - .pvd (ParaView Data): Collection file for time series
+
+2. Data Types:
+   - Scalar: Single value per point (pressure, temperature, speed)
+   - Vector: 2D/3D vector per point (velocity, force)
+   - Tensor: Matrix per point (stress, strain)
+
+3. Grid Types:
+   - Structured: Regular nx × ny grid (used here)
+   - Unstructured: Arbitrary connectivity (complex geometries)
+   - Rectilinear: Non-uniform spacing
+
+Visualization in ParaView:
+- Contours: Show iso-lines/surfaces of scalar fields
+- Glyphs: Arrows showing vector direction and magnitude
+- Streamlines: Particle paths following velocity field
+- Slice: Cut through 3D data
+
+Time Series:
+Writing files with sequential names (field_0000.vtk, field_0001.vtk, ...)
+allows ParaView to animate the simulation evolution.
 """
 
 import os
