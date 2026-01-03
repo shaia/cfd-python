@@ -185,6 +185,17 @@ _CORE_EXPORTS = [
     "CFDDivergedError",
     "CFDMaxIterError",
     "raise_for_status",
+    # CPU Features API (Phase 6)
+    "SIMD_NONE",
+    "SIMD_AVX2",
+    "SIMD_NEON",
+    "get_simd_arch",
+    "get_simd_name",
+    "has_avx2",
+    "has_neon",
+    "has_simd",
+    # Grid initialization variants (Phase 6)
+    "create_grid_stretched",
 ]
 
 # Load C extension and populate module namespace

@@ -376,3 +376,268 @@ class TestMemoryLeakPrevention:
             if "stats" in result:
                 assert isinstance(result["stats"], dict)
             del result
+
+
+class TestPyLongAndPyUnicodeReturns:
+    """Test that functions returning PyLong and PyUnicode handle NULL correctly.
+
+    These tests cover the NULL handling fixes for PyLong_FromLong and
+    PyUnicode_FromString return values in functions like get_last_status,
+    get_simd_arch, get_last_error, etc.
+    """
+
+    def test_get_last_status_returns_int(self):
+        """get_last_status() should return a proper Python int."""
+        import cfd_python
+
+        status = cfd_python.get_last_status()
+        assert isinstance(status, int)
+
+    def test_get_last_status_repeated_calls(self):
+        """Repeated calls to get_last_status() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            status = cfd_python.get_last_status()
+            assert isinstance(status, int)
+            # Status can be positive (success) or negative (error codes)
+
+    def test_get_last_error_returns_string_or_none(self):
+        """get_last_error() should return a string or None."""
+        import cfd_python
+
+        error = cfd_python.get_last_error()
+        assert error is None or isinstance(error, str)
+
+    def test_get_last_error_repeated_calls(self):
+        """Repeated calls to get_last_error() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            error = cfd_python.get_last_error()
+            assert error is None or isinstance(error, str)
+
+    def test_get_error_string_returns_string(self):
+        """get_error_string() should return a proper Python string."""
+        import cfd_python
+
+        # Test with known status codes
+        for status in [0, 1, 2, 3, 4, 5]:
+            error_str = cfd_python.get_error_string(status)
+            assert isinstance(error_str, str)
+            assert len(error_str) > 0
+
+    def test_get_error_string_repeated_calls(self):
+        """Repeated calls to get_error_string() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            error_str = cfd_python.get_error_string(0)
+            assert isinstance(error_str, str)
+
+    def test_bc_get_backend_returns_int(self):
+        """bc_get_backend() should return a proper Python int."""
+        import cfd_python
+
+        backend = cfd_python.bc_get_backend()
+        assert isinstance(backend, int)
+
+    def test_bc_get_backend_repeated_calls(self):
+        """Repeated calls to bc_get_backend() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            backend = cfd_python.bc_get_backend()
+            assert isinstance(backend, int)
+
+    def test_bc_get_backend_name_returns_string(self):
+        """bc_get_backend_name() should return a proper Python string."""
+        import cfd_python
+
+        name = cfd_python.bc_get_backend_name()
+        assert isinstance(name, str)
+        assert len(name) > 0
+
+    def test_bc_get_backend_name_repeated_calls(self):
+        """Repeated calls to bc_get_backend_name() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            name = cfd_python.bc_get_backend_name()
+            assert isinstance(name, str)
+            assert len(name) > 0
+
+    def test_backend_get_name_returns_string(self):
+        """backend_get_name() should return a proper Python string."""
+        import cfd_python
+
+        # Get current backend first
+        backend = cfd_python.bc_get_backend()
+        name = cfd_python.backend_get_name(backend)
+        assert isinstance(name, str)
+        assert len(name) > 0
+
+    def test_backend_get_name_repeated_calls(self):
+        """Repeated calls to backend_get_name() should work without issues."""
+        import cfd_python
+
+        backend = cfd_python.bc_get_backend()
+        for _ in range(100):
+            name = cfd_python.backend_get_name(backend)
+            assert isinstance(name, str)
+
+    def test_get_simd_arch_returns_int(self):
+        """get_simd_arch() should return a proper Python int."""
+        import cfd_python
+
+        arch = cfd_python.get_simd_arch()
+        assert isinstance(arch, int)
+        # Should be a valid SIMD constant
+        valid_values = [cfd_python.SIMD_NONE, cfd_python.SIMD_AVX2, cfd_python.SIMD_NEON]
+        assert arch in valid_values
+
+    def test_get_simd_arch_repeated_calls(self):
+        """Repeated calls to get_simd_arch() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            arch = cfd_python.get_simd_arch()
+            assert isinstance(arch, int)
+
+    def test_get_simd_name_returns_string(self):
+        """get_simd_name() should return a proper Python string."""
+        import cfd_python
+
+        name = cfd_python.get_simd_name()
+        assert isinstance(name, str)
+        valid_names = ["none", "avx2", "neon"]
+        assert name in valid_names
+
+    def test_get_simd_name_repeated_calls(self):
+        """Repeated calls to get_simd_name() should work without issues."""
+        import cfd_python
+
+        for _ in range(100):
+            name = cfd_python.get_simd_name()
+            assert isinstance(name, str)
+
+
+class TestPyLongPyUnicodeStress:
+    """Stress tests for PyLong and PyUnicode return value handling."""
+
+    def test_mixed_pylong_functions_stress(self):
+        """Test rapid mixed calls to PyLong-returning functions."""
+        import cfd_python
+
+        for _ in range(50):
+            status = cfd_python.get_last_status()
+            backend = cfd_python.bc_get_backend()
+            arch = cfd_python.get_simd_arch()
+
+            assert isinstance(status, int)
+            assert isinstance(backend, int)
+            assert isinstance(arch, int)
+
+            del status, backend, arch
+
+    def test_mixed_pyunicode_functions_stress(self):
+        """Test rapid mixed calls to PyUnicode-returning functions."""
+        import cfd_python
+
+        backend = cfd_python.bc_get_backend()
+        for _ in range(50):
+            error = cfd_python.get_last_error()
+            error_str = cfd_python.get_error_string(0)
+            backend_name = cfd_python.bc_get_backend_name()
+            backend_name2 = cfd_python.backend_get_name(backend)
+            simd_name = cfd_python.get_simd_name()
+
+            assert error is None or isinstance(error, str)
+            assert isinstance(error_str, str)
+            assert isinstance(backend_name, str)
+            assert isinstance(backend_name2, str)
+            assert isinstance(simd_name, str)
+
+            del error, error_str, backend_name, backend_name2, simd_name
+
+    def test_all_fixed_functions_combined_stress(self):
+        """Stress test all functions that had NULL handling fixes."""
+        import cfd_python
+
+        backend = cfd_python.bc_get_backend()
+
+        for i in range(100):
+            # PyLong returns
+            status = cfd_python.get_last_status()
+            bc_backend = cfd_python.bc_get_backend()
+            arch = cfd_python.get_simd_arch()
+
+            # PyUnicode returns
+            error = cfd_python.get_last_error()
+            error_str = cfd_python.get_error_string(status)
+            bc_name = cfd_python.bc_get_backend_name()
+            backend_name = cfd_python.backend_get_name(backend)
+            simd_name = cfd_python.get_simd_name()
+
+            # Verify all types
+            assert isinstance(status, int)
+            assert isinstance(bc_backend, int)
+            assert isinstance(arch, int)
+            assert error is None or isinstance(error, str)
+            assert isinstance(error_str, str)
+            assert isinstance(bc_name, str)
+            assert isinstance(backend_name, str)
+            assert isinstance(simd_name, str)
+
+    def test_refcount_for_returned_strings(self):
+        """Test that returned strings have correct reference counts."""
+        import sys
+
+        import cfd_python
+
+        backend = cfd_python.bc_get_backend()
+
+        # Get fresh strings
+        error_str = cfd_python.get_error_string(0)
+        bc_name = cfd_python.bc_get_backend_name()
+        backend_name = cfd_python.backend_get_name(backend)
+        simd_name = cfd_python.get_simd_name()
+
+        # Check refcounts (Python may intern some strings, but shouldn't be excessive)
+        for name, val in [
+            ("error_str", error_str),
+            ("bc_name", bc_name),
+            ("backend_name", backend_name),
+            ("simd_name", simd_name),
+        ]:
+            refcount = sys.getrefcount(val)
+            # String interning can cause higher refcounts for common strings
+            # but we check for excessively high counts that would indicate a bug
+            assert refcount < 1000, f"Suspiciously high refcount for {name}: {refcount}"
+
+    def test_refcount_for_returned_ints(self):
+        """Test that returned ints have correct reference counts.
+
+        Note: Python caches small integers (-5 to 256), so their refcounts can
+        be extremely high (millions to billions). For values like 0, the refcount
+        can exceed 1 billion due to internal Python usage. We only verify the
+        functions return valid ints without crashing.
+        """
+        import sys
+
+        import cfd_python
+
+        # Get return values and verify they're valid integers
+        status = cfd_python.get_last_status()
+        backend = cfd_python.bc_get_backend()
+        arch = cfd_python.get_simd_arch()
+
+        # Verify all are valid integers (refcount check is not reliable for cached ints)
+        assert isinstance(status, int)
+        assert isinstance(backend, int)
+        assert isinstance(arch, int)
+
+        # These should be callable without segfaults
+        _ = sys.getrefcount(status)
+        _ = sys.getrefcount(backend)
+        _ = sys.getrefcount(arch)

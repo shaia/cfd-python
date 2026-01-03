@@ -13,6 +13,7 @@
 #include "cfd/core/grid.h"
 #include "cfd/core/cfd_status.h"
 #include "cfd/core/derived_fields.h"
+#include "cfd/core/cpu_features.h"
 #include "cfd/solvers/navier_stokes_solver.h"
 #include "cfd/api/simulation_api.h"
 #include "cfd/io/vtk_output.h"
@@ -780,7 +781,11 @@ static PyObject* get_last_error(PyObject* self, PyObject* args) {
 
     const char* error = cfd_get_last_error();
     if (error && error[0] != '\0') {
-        return PyUnicode_FromString(error);
+        PyObject* result = PyUnicode_FromString(error);
+        if (result == NULL) {
+            return NULL;  // PyUnicode_FromString sets exception on failure
+        }
+        return result;
     }
     Py_RETURN_NONE;
 }
@@ -793,7 +798,11 @@ static PyObject* get_last_status(PyObject* self, PyObject* args) {
     (void)args;
 
     cfd_status_t status = cfd_get_last_status();
-    return PyLong_FromLong((long)status);
+    PyObject* result = PyLong_FromLong((long)status);
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
 }
 
 /*
@@ -819,7 +828,11 @@ static PyObject* get_error_string(PyObject* self, PyObject* args) {
     }
 
     const char* str = cfd_get_error_string((cfd_status_t)status);
-    return PyUnicode_FromString(str);
+    PyObject* result = PyUnicode_FromString(str);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /* ============================================================================
@@ -832,7 +845,11 @@ static PyObject* get_error_string(PyObject* self, PyObject* args) {
 static PyObject* bc_get_backend_py(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
-    return PyLong_FromLong((long)bc_get_backend());
+    PyObject* result = PyLong_FromLong((long)bc_get_backend());
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
 }
 
 /*
@@ -841,7 +858,11 @@ static PyObject* bc_get_backend_py(PyObject* self, PyObject* args) {
 static PyObject* bc_get_backend_name_py(PyObject* self, PyObject* args) {
     (void)self;
     (void)args;
-    return PyUnicode_FromString(bc_get_backend_name());
+    PyObject* result = PyUnicode_FromString(bc_get_backend_name());
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /*
@@ -910,7 +931,11 @@ static PyObject* backend_get_name_py(PyObject* self, PyObject* args) {
     if (name == NULL) {
         Py_RETURN_NONE;
     }
-    return PyUnicode_FromString(name);
+    PyObject* result = PyUnicode_FromString(name);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
 }
 
 /*
@@ -959,7 +984,12 @@ static PyObject* list_solvers_by_backend_py(PyObject* self, PyObject* args) {
             free(names);
             return NULL;
         }
-        PyList_SetItem(result, i, name);  // Steals reference
+        if (PyList_SetItem(result, i, name) < 0) {  // Steals reference on success
+            Py_DECREF(name);
+            Py_DECREF(result);
+            free(names);
+            return NULL;
+        }
     }
 
     free(names);
@@ -1007,6 +1037,217 @@ static PyObject* get_available_backends_py(PyObject* self, PyObject* args) {
     }
 
     return result;
+}
+
+// ============================================================================
+// CPU Features API (Phase 6)
+// ============================================================================
+
+/*
+ * Get the detected SIMD architecture
+ * Returns: int (SIMD_NONE=0, SIMD_AVX2=1, SIMD_NEON=2)
+ */
+static PyObject* get_simd_arch_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    cfd_simd_arch_t arch = cfd_detect_simd_arch();
+    PyObject* result = PyLong_FromLong((long)arch);
+    if (result == NULL) {
+        return NULL;  // PyLong_FromLong sets MemoryError on failure
+    }
+    return result;
+}
+
+/*
+ * Get the name of the detected SIMD architecture
+ * Returns: str ("avx2", "neon", or "none")
+ */
+static PyObject* get_simd_name_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    const char* name = cfd_get_simd_name();
+    PyObject* result = PyUnicode_FromString(name);
+    if (result == NULL) {
+        return NULL;  // PyUnicode_FromString sets exception on failure
+    }
+    return result;
+}
+
+/*
+ * Check if AVX2 is available
+ * Returns: bool
+ */
+static PyObject* has_avx2_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    bool available = cfd_has_avx2();
+    return PyBool_FromLong(available);
+}
+
+/*
+ * Check if ARM NEON is available
+ * Returns: bool
+ */
+static PyObject* has_neon_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    bool available = cfd_has_neon();
+    return PyBool_FromLong(available);
+}
+
+/*
+ * Check if any SIMD is available (AVX2 or NEON)
+ * Returns: bool
+ */
+static PyObject* has_simd_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    bool available = cfd_has_simd();
+    return PyBool_FromLong(available);
+}
+
+// ============================================================================
+// Grid Initialization Variants (Phase 6)
+// ============================================================================
+
+/*
+ * Create a grid with stretched (non-uniform) spacing
+ * Args: nx, ny, xmin, xmax, ymin, ymax, beta
+ * Returns: dict with grid information
+ */
+static PyObject* create_grid_stretched_py(PyObject* self, PyObject* args) {
+    (void)self;
+
+    long nx_signed, ny_signed;
+    double xmin, xmax, ymin, ymax, beta;
+
+    if (!PyArg_ParseTuple(args, "llddddd", &nx_signed, &ny_signed,
+                          &xmin, &xmax, &ymin, &ymax, &beta)) {
+        return NULL;
+    }
+
+    if (nx_signed <= 0 || ny_signed <= 0) {
+        PyErr_SetString(PyExc_ValueError, "Grid dimensions must be positive");
+        return NULL;
+    }
+    if (xmax <= xmin) {
+        PyErr_SetString(PyExc_ValueError, "xmax must be greater than xmin");
+        return NULL;
+    }
+    if (ymax <= ymin) {
+        PyErr_SetString(PyExc_ValueError, "ymax must be greater than ymin");
+        return NULL;
+    }
+    if (beta <= 0.0) {
+        PyErr_SetString(PyExc_ValueError, "beta must be positive");
+        return NULL;
+    }
+
+    size_t nx = (size_t)nx_signed;
+    size_t ny = (size_t)ny_signed;
+
+    grid* g = grid_create(nx, ny, xmin, xmax, ymin, ymax);
+    if (g == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create grid");
+        return NULL;
+    }
+
+    grid_initialize_stretched(g, beta);
+
+    // Return grid information as a dictionary
+    PyObject* grid_dict = PyDict_New();
+    if (grid_dict == NULL) {
+        grid_destroy(g);
+        return NULL;
+    }
+
+    // Helper macro to add values to dict with proper refcount and error handling
+    #define ADD_TO_DICT_STRETCHED(dict, key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); grid_destroy(g); return NULL; } \
+        if (PyDict_SetItemString(dict, key, tmp) < 0) { \
+            Py_DECREF(tmp); Py_DECREF(dict); grid_destroy(g); return NULL; \
+        } \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_TO_DICT_STRETCHED(grid_dict, "nx", PyLong_FromSize_t(g->nx));
+    ADD_TO_DICT_STRETCHED(grid_dict, "ny", PyLong_FromSize_t(g->ny));
+    ADD_TO_DICT_STRETCHED(grid_dict, "xmin", PyFloat_FromDouble(g->xmin));
+    ADD_TO_DICT_STRETCHED(grid_dict, "xmax", PyFloat_FromDouble(g->xmax));
+    ADD_TO_DICT_STRETCHED(grid_dict, "ymin", PyFloat_FromDouble(g->ymin));
+    ADD_TO_DICT_STRETCHED(grid_dict, "ymax", PyFloat_FromDouble(g->ymax));
+    ADD_TO_DICT_STRETCHED(grid_dict, "beta", PyFloat_FromDouble(beta));
+
+    #undef ADD_TO_DICT_STRETCHED
+
+    // Create coordinate lists
+    PyObject* x_list = PyList_New((Py_ssize_t)g->nx);
+    PyObject* y_list = PyList_New((Py_ssize_t)g->ny);
+    if (x_list == NULL || y_list == NULL) {
+        Py_XDECREF(x_list);
+        Py_XDECREF(y_list);
+        Py_DECREF(grid_dict);
+        grid_destroy(g);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < g->nx; i++) {
+        PyObject* val = PyFloat_FromDouble(g->x[i]);
+        if (val == NULL) {
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(g);
+            return NULL;
+        }
+        if (PyList_SetItem(x_list, (Py_ssize_t)i, val) < 0) {  // steals reference on success
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(g);
+            return NULL;
+        }
+    }
+
+    for (size_t i = 0; i < g->ny; i++) {
+        PyObject* val = PyFloat_FromDouble(g->y[i]);
+        if (val == NULL) {
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(g);
+            return NULL;
+        }
+        if (PyList_SetItem(y_list, (Py_ssize_t)i, val) < 0) {  // steals reference on success
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
+            Py_DECREF(x_list);
+            Py_DECREF(y_list);
+            Py_DECREF(grid_dict);
+            grid_destroy(g);
+            return NULL;
+        }
+    }
+
+    if (PyDict_SetItemString(grid_dict, "x_coords", x_list) < 0 ||
+        PyDict_SetItemString(grid_dict, "y_coords", y_list) < 0) {
+        Py_DECREF(x_list);
+        Py_DECREF(y_list);
+        Py_DECREF(grid_dict);
+        grid_destroy(g);
+        return NULL;
+    }
+    Py_DECREF(x_list);
+    Py_DECREF(y_list);
+
+    grid_destroy(g);
+    return grid_dict;
 }
 
 /*
@@ -1067,6 +1308,7 @@ static PyObject* bc_apply_scalar_py(PyObject* self, PyObject* args, PyObject* kw
             return NULL;
         }
         if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);  // PyList_SetItem doesn't steal on failure
             free(field);
             return NULL;
         }
@@ -1142,8 +1384,19 @@ static PyObject* bc_apply_velocity_py(PyObject* self, PyObject* args, PyObject* 
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1208,7 +1461,11 @@ static PyObject* bc_apply_dirichlet_scalar_py(PyObject* self, PyObject* args, Py
             free(field);
             return NULL;
         }
-        PyList_SetItem(field_list, i, val);
+        if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);
+            free(field);
+            return NULL;
+        }
     }
 
     free(field);
@@ -1280,8 +1537,19 @@ static PyObject* bc_apply_noslip_py(PyObject* self, PyObject* args, PyObject* kw
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1359,8 +1627,19 @@ static PyObject* bc_apply_inlet_uniform_py(PyObject* self, PyObject* args, PyObj
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1438,8 +1717,19 @@ static PyObject* bc_apply_inlet_parabolic_py(PyObject* self, PyObject* args, PyO
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1506,7 +1796,11 @@ static PyObject* bc_apply_outlet_scalar_py(PyObject* self, PyObject* args, PyObj
             free(field);
             return NULL;
         }
-        PyList_SetItem(field_list, i, val);
+        if (PyList_SetItem(field_list, i, val) < 0) {
+            Py_DECREF(val);
+            free(field);
+            return NULL;
+        }
     }
 
     free(field);
@@ -1582,8 +1876,19 @@ static PyObject* bc_apply_outlet_velocity_py(PyObject* self, PyObject* args, PyO
             free(v);
             return NULL;
         }
-        PyList_SetItem(u_list, i, u_val);
-        PyList_SetItem(v_list, i, v_val);
+        if (PyList_SetItem(u_list, i, u_val) < 0) {
+            Py_DECREF(u_val);
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
+        if (PyList_SetItem(v_list, i, v_val) < 0) {
+            Py_DECREF(v_val);
+            free(u);
+            free(v);
+            return NULL;
+        }
     }
 
     free(u);
@@ -1746,7 +2051,13 @@ static PyObject* compute_velocity_magnitude_py(PyObject* self, PyObject* args) {
             flow_field_destroy(field);
             return NULL;
         }
-        PyList_SetItem(result, i, val);
+        if (PyList_SetItem(result, i, val) < 0) {
+            Py_DECREF(val);
+            Py_DECREF(result);
+            derived_fields_destroy(derived);
+            flow_field_destroy(field);
+            return NULL;
+        }
     }
 
     derived_fields_destroy(derived);
@@ -2140,6 +2451,45 @@ static PyMethodDef cfd_python_methods[] = {
      "Get list of all available backends.\n\n"
      "Returns:\n"
      "    list: Names of available backends (e.g., ['scalar', 'simd', 'omp'])"},
+    // CPU Features API (Phase 6)
+    {"get_simd_arch", get_simd_arch_py, METH_NOARGS,
+     "Get the detected SIMD architecture.\n\n"
+     "Returns:\n"
+     "    int: SIMD_NONE (0), SIMD_AVX2 (1), or SIMD_NEON (2)"},
+    {"get_simd_name", get_simd_name_py, METH_NOARGS,
+     "Get the name of the detected SIMD architecture.\n\n"
+     "Returns:\n"
+     "    str: 'avx2', 'neon', or 'none'"},
+    {"has_avx2", has_avx2_py, METH_NOARGS,
+     "Check if AVX2 (x86-64) is available.\n\n"
+     "Returns:\n"
+     "    bool: True if AVX2 is available and usable"},
+    {"has_neon", has_neon_py, METH_NOARGS,
+     "Check if ARM NEON is available.\n\n"
+     "Returns:\n"
+     "    bool: True if ARM NEON is available"},
+    {"has_simd", has_simd_py, METH_NOARGS,
+     "Check if any SIMD (AVX2 or NEON) is available.\n\n"
+     "Returns:\n"
+     "    bool: True if any SIMD instruction set is available"},
+    // Grid Initialization Variants (Phase 6)
+    {"create_grid_stretched", create_grid_stretched_py, METH_VARARGS,
+     "Create a grid with stretched (non-uniform) spacing.\n\n"
+     "WARNING: The current implementation has a known bug. The cosh-based formula\n"
+     "clusters points toward the CENTER of the domain (not boundaries) and does not\n"
+     "span the full domain [xmin, xmax]. Both endpoints map to xmin.\n"
+     "See cfd-workspace/cfd/ROADMAP.md 'Known Issues' for details and fix status.\n\n"
+     "Args:\n"
+     "    nx (int): Grid points in x direction\n"
+     "    ny (int): Grid points in y direction\n"
+     "    xmin (float): Minimum x coordinate\n"
+     "    xmax (float): Maximum x coordinate\n"
+     "    ymin (float): Minimum y coordinate\n"
+     "    ymax (float): Maximum y coordinate\n"
+     "    beta (float): Stretching factor (> 0, typically 1.0-3.0)\n\n"
+     "Returns:\n"
+     "    dict: Grid info with 'nx', 'ny', 'x_coords', 'y_coords', 'xmin', 'xmax',\n"
+     "          'ymin', 'ymax', 'beta'"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2294,6 +2644,14 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         PyModule_AddIntConstant(m, "BACKEND_SIMD", NS_SOLVER_BACKEND_SIMD) < 0 ||
         PyModule_AddIntConstant(m, "BACKEND_OMP", NS_SOLVER_BACKEND_OMP) < 0 ||
         PyModule_AddIntConstant(m, "BACKEND_CUDA", NS_SOLVER_BACKEND_CUDA) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add SIMD architecture constants (Phase 6)
+    if (PyModule_AddIntConstant(m, "SIMD_NONE", CFD_SIMD_NONE) < 0 ||
+        PyModule_AddIntConstant(m, "SIMD_AVX2", CFD_SIMD_AVX2) < 0 ||
+        PyModule_AddIntConstant(m, "SIMD_NEON", CFD_SIMD_NEON) < 0) {
         Py_DECREF(m);
         return NULL;
     }
