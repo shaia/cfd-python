@@ -85,8 +85,9 @@ def main():
         ("CFDMaxIterError", cfd_python.CFDMaxIterError, cfd_python.CFDError),
     ]
 
-    print("   Exception hierarchy:")
-    for name, exc_class, base in exceptions:
+    print("   Exception hierarchy (showing Method Resolution Order):")
+    for name, exc_class, _ in exceptions:
+        # __mro__[1:-1] gives all base classes except the class itself and 'object'
         bases = ", ".join(b.__name__ for b in exc_class.__mro__[1:-1])
         print(f"     {name} <- {bases}")
 

@@ -115,11 +115,14 @@ def main():
     print(f"  SIMD: {cfd_python.get_simd_name()}")
     print(f"  BC Backend: {cfd_python.bc_get_backend_name()}")
 
-    # Set up flow
-    print("\nSetting up channel flow...")
+    # Set up flow - demonstrates how to configure boundary conditions
+    # Note: setup_channel_flow shows BC API usage; run_simulation_with_params
+    # creates its own internal fields. The u, v, p here are used to verify
+    # the BC setup and for comparison with analytical solutions.
+    print("\nSetting up channel flow (BC demonstration)...")
     u, v, p = setup_channel_flow(nx, ny, u_max)
 
-    # Verify inlet profile
+    # Verify inlet profile (parabolic velocity distribution)
     print("\nInlet velocity profile (left edge):")
     print(f"  {'j':>4}  {'y':>8}  {'u':>10}")
     print("  " + "-" * 26)
