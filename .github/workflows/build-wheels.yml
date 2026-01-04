@@ -124,7 +124,8 @@ jobs:
         with:
           cuda: '12.4.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "nvrtc_dev", "cublas_dev", "cusparse_dev"]'
+          # visual_studio_integration required for CMake to find CUDA toolset
+          sub-packages: '["nvcc", "cudart", "nvrtc_dev", "cublas_dev", "cusparse_dev", "visual_studio_integration"]'
 
       - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
