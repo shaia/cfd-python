@@ -53,20 +53,13 @@ jobs:
         run: uv pip install --system build scikit-build-core setuptools-scm
 
       # ============ CPU-only builds ============
+      # Note: Linux CPU build is done inside manylinux container (see Build wheel step)
+
       - name: Build CFD library (Linux - CPU only)
         if: runner.os == 'Linux' && matrix.variant == 'cpu'
         run: |
-          # Build CPU-only for maximum compatibility
-          # Includes: Scalar, SIMD (AVX2), OpenMP backends
-          # Excludes: CUDA (avoid runtime dependency issues)
-          cmake -S cfd -B cfd/build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DCFD_ENABLE_CUDA=OFF
-          cmake --build cfd/build --config Release
-          echo "=== CFD library built (CPU-only) ==="
-          ls -la cfd/build/lib/
+          echo "Linux CPU build will be done inside manylinux container"
+          echo "Skipping host build to ensure glibc compatibility"
 
       - name: Build CFD library (macOS - CPU only)
         if: runner.os == 'macOS'
@@ -130,6 +123,9 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         with:
           cuda: '12.4.0'
+          method: 'network'
+          # visual_studio_integration required for CMake to find CUDA toolset
+          sub-packages: '["nvcc", "cudart", "nvrtc_dev", "cublas_dev", "cusparse_dev", "visual_studio_integration"]'
 
       - name: Build CFD library (Windows with CUDA)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
@@ -146,8 +142,53 @@ jobs:
           dir cfd\build\lib\Release
 
       # ============ Build wheels ============
-      - name: Build wheel (Unix)
-        if: runner.os != 'Windows'
+      # Linux wheels must be built inside manylinux container for glibc compatibility
+      - name: Build wheel (Linux - CPU)
+        if: runner.os == 'Linux' && matrix.variant == 'cpu'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e CFD_STATIC_LINK=ON \
+            -e CFD_USE_STABLE_ABI=ON \
+            quay.io/pypa/manylinux_2_28_x86_64 \
+            bash -c "
+              set -e
+              # Build CFD C library inside container
+              cmake -S cfd -B cfd/build \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+                -DCFD_ENABLE_CUDA=OFF
+              cmake --build cfd/build --config Release
+
+              # Build Python wheel
+              export CFD_ROOT=/workspace/cfd
+              /opt/python/cp39-cp39/bin/pip install scikit-build-core setuptools-scm
+              /opt/python/cp39-cp39/bin/pip wheel . --no-deps --wheel-dir dist_raw/
+
+              # Repair wheel for manylinux compatibility
+              /opt/python/cp39-cp39/bin/pip install auditwheel
+              auditwheel repair dist_raw/*.whl --plat manylinux_2_28_x86_64 -w dist/
+            "
+          echo "=== Wheel built (manylinux) ==="
+          ls -la dist/
+
+      - name: Build wheel (Linux - CUDA)
+        if: runner.os == 'Linux' && matrix.variant == 'cuda'
+        env:
+          CFD_ROOT: ${{ github.workspace }}/cfd
+          CFD_STATIC_LINK: "ON"
+          CFD_USE_STABLE_ABI: "ON"
+        run: |
+          # CUDA wheels use host build (CUDA not available in manylinux container)
+          # These wheels require matching CUDA runtime on user system
+          pip wheel . --no-deps --wheel-dir dist/
+          echo "=== Wheel built (CUDA - linux native) ==="
+          ls -la dist/
+
+      - name: Build wheel (macOS)
+        if: runner.os == 'macOS'
         env:
           CFD_ROOT: ${{ github.workspace }}/cfd
           CFD_STATIC_LINK: "ON"
