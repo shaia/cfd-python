@@ -167,11 +167,13 @@ jobs:
         run: |
           # Build inside NVIDIA's manylinux-compatible CUDA container
           # Rocky Linux 8 is manylinux_2_28 compatible
+          # Use --user to match host UID/GID for proper file ownership
           docker run --rm \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             -e CFD_STATIC_LINK=ON \
             -e CFD_USE_STABLE_ABI=ON \
+            -e HOME=/tmp \
             nvidia/cuda:12.4.0-devel-rockylinux8 \
             bash -c "
               set -e
@@ -179,6 +181,9 @@ jobs:
               dnf install -y cmake git python3.11 python3.11-pip python3.11-devel
               # Install patchelf via pip (EPEL version is too old for auditwheel)
               python3.11 -m pip install patchelf
+
+              # Clean any previous build artifacts
+              rm -rf cfd/build build dist dist_raw
 
               # Build CFD C library with CUDA
               # 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
@@ -198,6 +203,9 @@ jobs:
               # Repair wheel for manylinux compatibility
               python3.11 -m pip install auditwheel
               auditwheel repair dist_raw/*.whl --plat manylinux_2_28_x86_64 -w dist/
+
+              # Fix permissions for host user
+              chmod -R 777 dist/
             "
           echo "=== Wheel built (CUDA manylinux) ==="
           ls -la dist/
