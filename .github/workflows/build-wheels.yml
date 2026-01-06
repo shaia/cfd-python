@@ -98,36 +98,13 @@ jobs:
           dir cfd\build\lib\Release
 
       # ============ CUDA builds ============
-      # Using CUDA 12.4 for compatibility with latest compilers:
-      # - Windows: MSVC 14.44 requires CUDA 12.4+
-      # - Linux: GCC 13 requires CUDA 12.4+ (or use GCC 12 with older CUDA)
-      - name: Install CUDA Toolkit (Linux)
-        if: runner.os == 'Linux' && matrix.variant == 'cuda'
-        run: |
-          # Install minimal CUDA 12.4 packages (avoid nsight tools with broken dependencies)
-          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
-          sudo dpkg -i cuda-keyring_1.1-1_all.deb
-          sudo apt-get update
-          # Install only compiler and runtime libraries (no profiling tools)
-          sudo apt-get install -y cuda-nvcc-12-4 cuda-cudart-dev-12-4 cuda-nvrtc-dev-12-4 libcublas-dev-12-4 libcusparse-dev-12-4
-          echo "/usr/local/cuda-12.4/bin" >> $GITHUB_PATH
-          echo "CUDA_PATH=/usr/local/cuda-12.4" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      # Note: Linux CUDA build is done inside NVIDIA manylinux container (see Build wheel step)
 
       - name: Build CFD library (Linux with CUDA)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
         run: |
-          # Build with CUDA for Turing+ architectures (RTX 20 series onwards)
-          # 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
-          cmake -S cfd -B cfd/build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DCFD_ENABLE_CUDA=ON \
-            -DCFD_CUDA_ARCHITECTURES="75;80;86;89;90"
-          cmake --build cfd/build --config Release
-          echo "=== CFD library built with CUDA ==="
-          ls -la cfd/build/lib/
+          echo "Linux CUDA build will be done inside NVIDIA manylinux container"
+          echo "Skipping host build to ensure manylinux compatibility"
 
       - name: Install CUDA Toolkit (Windows)
         if: runner.os == 'Windows' && matrix.variant == 'cuda'
@@ -187,15 +164,42 @@ jobs:
 
       - name: Build wheel (Linux - CUDA)
         if: runner.os == 'Linux' && matrix.variant == 'cuda'
-        env:
-          CFD_ROOT: ${{ github.workspace }}/cfd
-          CFD_STATIC_LINK: "ON"
-          CFD_USE_STABLE_ABI: "ON"
         run: |
-          # CUDA wheels use host build (CUDA not available in manylinux container)
-          # These wheels require matching CUDA runtime on user system
-          pip wheel . --no-deps --wheel-dir dist/
-          echo "=== Wheel built (CUDA - linux native) ==="
+          # Build inside NVIDIA's manylinux-compatible CUDA container
+          # Rocky Linux 8 is manylinux_2_28 compatible
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e CFD_STATIC_LINK=ON \
+            -e CFD_USE_STABLE_ABI=ON \
+            nvidia/cuda:12.4.0-devel-rockylinux8 \
+            bash -c "
+              set -e
+              # Install build tools (git for CMake FetchContent)
+              dnf install -y cmake git python3.11 python3.11-pip python3.11-devel
+              # Install patchelf via pip (EPEL version is too old for auditwheel)
+              python3.11 -m pip install patchelf
+
+              # Build CFD C library with CUDA
+              # 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
+              cmake -S cfd -B cfd/build \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+                -DCFD_ENABLE_CUDA=ON \
+                -DCFD_CUDA_ARCHITECTURES='75;80;86;89;90'
+              cmake --build cfd/build --config Release
+
+              # Build Python wheel
+              export CFD_ROOT=/workspace/cfd
+              python3.11 -m pip install scikit-build-core setuptools-scm
+              python3.11 -m pip wheel . --no-deps --wheel-dir dist_raw/
+
+              # Repair wheel for manylinux compatibility
+              python3.11 -m pip install auditwheel
+              auditwheel repair dist_raw/*.whl --plat manylinux_2_28_x86_64 -w dist/
+            "
+          echo "=== Wheel built (CUDA manylinux) ==="
           ls -la dist/
 
       - name: Build wheel (macOS)
