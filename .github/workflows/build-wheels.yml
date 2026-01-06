@@ -175,8 +175,8 @@ jobs:
             nvidia/cuda:12.4.0-devel-rockylinux8 \
             bash -c "
               set -e
-              # Install build tools (git required for CMake FetchContent)
-              dnf install -y cmake git python3.11 python3.11-pip python3.11-devel
+              # Install build tools (git for CMake FetchContent, patchelf for auditwheel)
+              dnf install -y cmake git patchelf python3.11 python3.11-pip python3.11-devel
 
               # Build CFD C library with CUDA
               # 75=Turing, 80=Ampere, 86=Ampere, 89=Ada, 90=Hopper
