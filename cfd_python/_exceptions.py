@@ -8,6 +8,8 @@ __all__ = [
     "CFDUnsupportedError",
     "CFDDivergedError",
     "CFDMaxIterError",
+    "CFDLimitExceededError",
+    "CFDNotFoundError",
     "raise_for_status",
 ]
 
@@ -83,6 +85,24 @@ class CFDMaxIterError(CFDError):
     pass
 
 
+class CFDLimitExceededError(CFDError, ResourceWarning):
+    """Raised when a resource limit is exceeded.
+
+    Corresponds to CFD_ERROR_LIMIT_EXCEEDED (-8).
+    """
+
+    pass
+
+
+class CFDNotFoundError(CFDError, LookupError):
+    """Raised when a requested resource is not found.
+
+    Corresponds to CFD_ERROR_NOT_FOUND (-9).
+    """
+
+    pass
+
+
 # Mapping from status codes to exception classes
 _STATUS_TO_EXCEPTION = {
     -1: CFDError,  # CFD_ERROR (generic)
@@ -92,6 +112,8 @@ _STATUS_TO_EXCEPTION = {
     -5: CFDUnsupportedError,  # CFD_ERROR_UNSUPPORTED
     -6: CFDDivergedError,  # CFD_ERROR_DIVERGED
     -7: CFDMaxIterError,  # CFD_ERROR_MAX_ITER
+    -8: CFDLimitExceededError,  # CFD_ERROR_LIMIT_EXCEEDED
+    -9: CFDNotFoundError,  # CFD_ERROR_NOT_FOUND
 }
 
 
