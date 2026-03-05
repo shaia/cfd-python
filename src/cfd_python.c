@@ -2934,6 +2934,13 @@ static PyMethodDef cfd_python_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+static void cfd_python_free(void* module) {
+    (void)module;
+    Py_XDECREF(g_log_callback);
+    g_log_callback = NULL;
+    cfd_set_log_callback(NULL);
+}
+
 static struct PyModuleDef cfd_python_module = {
     PyModuleDef_HEAD_INIT,
     "cfd_python",
@@ -2964,7 +2971,11 @@ static struct PyModuleDef cfd_python_module = {
     "  - 'explicit_euler_gpu': GPU-accelerated Euler solver\n"
     "  - 'projection_jacobi_gpu': GPU-accelerated projection solver",
     -1,
-    cfd_python_methods
+    cfd_python_methods,
+    NULL,           /* m_slots */
+    NULL,           /* m_traverse */
+    NULL,           /* m_clear */
+    cfd_python_free /* m_free */
 };
 
 PyMODINIT_FUNC PyInit_cfd_python(void) {
