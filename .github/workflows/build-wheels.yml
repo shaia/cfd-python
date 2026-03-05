@@ -19,8 +19,8 @@ on:
 
 env:
   # CFD C library version to build against
-  # v0.1.6 introduces modular backend libraries
-  CFD_VERSION: "v0.1.6"
+  # v0.2.0 adds 3D support, Poisson solver, GPU management, logging
+  CFD_VERSION: "v0.2.0"
 
 jobs:
   build_wheel:
