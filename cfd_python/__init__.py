@@ -1,4 +1,4 @@
-"""CFD Python - Python bindings for CFD simulation library v0.1.6+.
+"""CFD Python - Python bindings for CFD simulation library v0.2.0.
 
 This package provides Python bindings for the C-based CFD simulation library,
 enabling high-performance computational fluid dynamics simulations from Python.
@@ -24,6 +24,8 @@ Error handling:
     - CFD_ERROR_UNSUPPORTED: Operation not supported (-5)
     - CFD_ERROR_DIVERGED: Solver diverged (-6)
     - CFD_ERROR_MAX_ITER: Max iterations reached (-7)
+    - CFD_ERROR_LIMIT_EXCEEDED: Resource limit exceeded (-8)
+    - CFD_ERROR_NOT_FOUND: Resource not found (-9)
     - get_last_error(): Get last error message
     - get_last_status(): Get last status code
     - get_error_string(code): Get error description
@@ -37,9 +39,11 @@ Boundary conditions:
         - BC_TYPE_NOSLIP: No-slip wall (zero velocity)
         - BC_TYPE_INLET: Inlet velocity specification
         - BC_TYPE_OUTLET: Outlet conditions
+        - BC_TYPE_SYMMETRY: Symmetry boundary condition
 
     Edges:
         - BC_EDGE_LEFT, BC_EDGE_RIGHT, BC_EDGE_BOTTOM, BC_EDGE_TOP
+        - BC_EDGE_FRONT, BC_EDGE_BACK (3D boundaries)
 
     Backends:
         - BC_BACKEND_AUTO: Auto-select best available
@@ -79,6 +83,29 @@ Solver backend availability (v0.1.6):
         - backend_get_name(backend): Get backend name string
         - list_solvers_by_backend(backend): Get solvers for a backend
         - get_available_backends(): Get list of all available backends
+
+Library lifecycle (v0.2.0):
+    - init(): Initialize the CFD library
+    - finalize(): Clean up the CFD library
+    - is_initialized(): Check if library is initialized
+    - get_cfd_version(): Get C library version string
+
+Poisson solver (v0.2.0):
+    - get_default_poisson_params(): Default solver parameters
+    - poisson_get_backend(): Current backend
+    - poisson_get_backend_name(): Current backend name
+    - poisson_set_backend(backend): Set backend
+    - poisson_backend_available(backend): Check availability
+    - poisson_simd_available(): Check SIMD availability
+
+GPU device management (v0.2.0):
+    - gpu_is_available(): Check GPU availability
+    - gpu_get_device_info(): Get device information
+    - gpu_select_device(id): Select a device
+    - gpu_get_default_config(): Get default GPU config
+
+Logging (v0.2.0):
+    - set_log_callback(callable): Set log callback
 """
 
 from ._exceptions import (
@@ -86,8 +113,10 @@ from ._exceptions import (
     CFDError,
     CFDInvalidError,
     CFDIOError,
+    CFDLimitExceededError,
     CFDMaxIterError,
     CFDMemoryError,
+    CFDNotFoundError,
     CFDUnsupportedError,
     raise_for_status,
 )
@@ -196,6 +225,69 @@ _CORE_EXPORTS = [
     "has_simd",
     # Grid initialization variants (Phase 6)
     "create_grid_stretched",
+    # Library lifecycle (v0.2.0)
+    "init",
+    "finalize",
+    "is_initialized",
+    "get_cfd_version",
+    # Version constants (v0.2.0)
+    "CFD_VERSION_MAJOR",
+    "CFD_VERSION_MINOR",
+    "CFD_VERSION_PATCH",
+    # New status codes (v0.2.0)
+    "CFD_ERROR_LIMIT_EXCEEDED",
+    "CFD_ERROR_NOT_FOUND",
+    # New exception classes (v0.2.0)
+    "CFDLimitExceededError",
+    "CFDNotFoundError",
+    # New BC constants (v0.2.0)
+    "BC_TYPE_SYMMETRY",
+    "BC_EDGE_FRONT",
+    "BC_EDGE_BACK",
+    # Poisson solver method constants (v0.2.0)
+    "POISSON_METHOD_JACOBI",
+    "POISSON_METHOD_GAUSS_SEIDEL",
+    "POISSON_METHOD_SOR",
+    "POISSON_METHOD_REDBLACK_SOR",
+    "POISSON_METHOD_CG",
+    "POISSON_METHOD_BICGSTAB",
+    "POISSON_METHOD_MULTIGRID",
+    # Poisson solver backend constants (v0.2.0)
+    "POISSON_BACKEND_AUTO",
+    "POISSON_BACKEND_SCALAR",
+    "POISSON_BACKEND_OMP",
+    "POISSON_BACKEND_SIMD",
+    "POISSON_BACKEND_GPU",
+    # Poisson solver type presets (v0.2.0)
+    "POISSON_SOLVER_SOR_SCALAR",
+    "POISSON_SOLVER_JACOBI_SIMD",
+    "POISSON_SOLVER_REDBLACK_SIMD",
+    "POISSON_SOLVER_REDBLACK_OMP",
+    "POISSON_SOLVER_REDBLACK_SCALAR",
+    "POISSON_SOLVER_CG_SCALAR",
+    "POISSON_SOLVER_CG_SIMD",
+    "POISSON_SOLVER_CG_OMP",
+    "POISSON_SOLVER_SOR_SIMD",
+    # Poisson preconditioner constants (v0.2.0)
+    "POISSON_PRECOND_NONE",
+    "POISSON_PRECOND_JACOBI",
+    # Poisson solver functions (v0.2.0)
+    "get_default_poisson_params",
+    "poisson_get_backend",
+    "poisson_get_backend_name",
+    "poisson_set_backend",
+    "poisson_backend_available",
+    "poisson_simd_available",
+    # GPU functions (v0.2.0)
+    "gpu_is_available",
+    "gpu_get_device_info",
+    "gpu_select_device",
+    "gpu_get_default_config",
+    # Logging (v0.2.0)
+    "set_log_callback",
+    "CFD_LOG_LEVEL_INFO",
+    "CFD_LOG_LEVEL_WARNING",
+    "CFD_LOG_LEVEL_ERROR",
 ]
 
 # Load C extension and populate module namespace

@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Include CFD library headers (v0.1.5+ API)
+// Include CFD library headers (v0.2.0 API)
 #include "cfd/core/grid.h"
 #include "cfd/core/cfd_status.h"
 #include "cfd/core/derived_fields.h"
@@ -19,6 +19,11 @@
 #include "cfd/io/vtk_output.h"
 #include "cfd/io/csv_output.h"
 #include "cfd/boundary/boundary_conditions.h"
+#include "cfd/core/cfd_init.h"
+#include "cfd/core/cfd_version.h"
+#include "cfd/solvers/poisson_solver.h"
+#include "cfd/core/gpu_device.h"
+#include "cfd/core/logging.h"
 
 // Module-level solver registry (context-bound)
 static ns_solver_registry_t* g_registry = NULL;
@@ -192,9 +197,9 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
 
     simulation_data* sim_data;
     if (solver_type) {
-        sim_data = init_simulation_with_solver(nx, ny, xmin, xmax, ymin, ymax, solver_type);
+        sim_data = init_simulation_with_solver(nx, ny, 1, xmin, xmax, ymin, ymax, 0.0, 0.0, solver_type);
     } else {
-        sim_data = init_simulation(nx, ny, xmin, xmax, ymin, ymax);
+        sim_data = init_simulation(nx, ny, 1, xmin, xmax, ymin, ymax, 0.0, 0.0);
     }
 
     if (sim_data == NULL) {
@@ -214,14 +219,15 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
     // Write output if requested
     if (output_file) {
         write_vtk_flow_field(output_file, sim_data->field,
-                            sim_data->grid->nx, sim_data->grid->ny,
+                            sim_data->grid->nx, sim_data->grid->ny, sim_data->grid->nz,
                             sim_data->grid->xmin, sim_data->grid->xmax,
-                            sim_data->grid->ymin, sim_data->grid->ymax);
+                            sim_data->grid->ymin, sim_data->grid->ymax,
+                            sim_data->grid->zmin, sim_data->grid->zmax);
     }
 
     // Compute velocity magnitude using derived_fields
     flow_field* field = sim_data->field;
-    derived_fields* derived = derived_fields_create(field->nx, field->ny);
+    derived_fields* derived = derived_fields_create(field->nx, field->ny, field->nz);
     if (derived == NULL) {
         free_simulation(sim_data);
         PyErr_SetString(PyExc_MemoryError, "Failed to create derived fields");
@@ -260,12 +266,18 @@ static PyObject* run_simulation(PyObject* self, PyObject* args, PyObject* kwds) 
 /*
  * Create a simple grid function
  */
-static PyObject* create_grid(PyObject* self, PyObject* args) {
+static PyObject* create_grid(PyObject* self, PyObject* args, PyObject* kwds) {
     (void)self;
+    static const char* const kwlist[] = {"nx", "ny", "xmin", "xmax", "ymin", "ymax",
+                                         "nz", "zmin", "zmax", NULL};
     Py_ssize_t nx_signed, ny_signed;
+    Py_ssize_t nz_signed = 1;
     double xmin, xmax, ymin, ymax;
+    double zmin = 0.0, zmax = 0.0;
 
-    if (!PyArg_ParseTuple(args, "nndddd", &nx_signed, &ny_signed, &xmin, &xmax, &ymin, &ymax)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "nndddd|ndd", (char**)kwlist,
+                                     &nx_signed, &ny_signed, &xmin, &xmax, &ymin, &ymax,
+                                     &nz_signed, &zmin, &zmax)) {
         return NULL;
     }
 
@@ -278,6 +290,10 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
         PyErr_SetString(PyExc_ValueError, "ny must be at least 2");
         return NULL;
     }
+    if (nz_signed < 1) {
+        PyErr_SetString(PyExc_ValueError, "nz must be at least 1");
+        return NULL;
+    }
     if (xmax <= xmin) {
         PyErr_SetString(PyExc_ValueError, "xmax must be greater than xmin");
         return NULL;
@@ -286,11 +302,16 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
         PyErr_SetString(PyExc_ValueError, "ymax must be greater than ymin");
         return NULL;
     }
+    if (nz_signed > 1 && zmax <= zmin) {
+        PyErr_SetString(PyExc_ValueError, "zmax must be greater than zmin when nz > 1");
+        return NULL;
+    }
 
     size_t nx = (size_t)nx_signed;
     size_t ny = (size_t)ny_signed;
+    size_t nz = (size_t)nz_signed;
 
-    grid* g = grid_create(nx, ny, xmin, xmax, ymin, ymax);
+    grid* g = grid_create(nx, ny, nz, xmin, xmax, ymin, ymax, zmin, zmax);
     if (g == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to create grid");
         return NULL;
@@ -315,10 +336,13 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
 
     ADD_TO_DICT(grid_dict, "nx", PyLong_FromSize_t(g->nx));
     ADD_TO_DICT(grid_dict, "ny", PyLong_FromSize_t(g->ny));
+    ADD_TO_DICT(grid_dict, "nz", PyLong_FromSize_t(g->nz));
     ADD_TO_DICT(grid_dict, "xmin", PyFloat_FromDouble(g->xmin));
     ADD_TO_DICT(grid_dict, "xmax", PyFloat_FromDouble(g->xmax));
     ADD_TO_DICT(grid_dict, "ymin", PyFloat_FromDouble(g->ymin));
     ADD_TO_DICT(grid_dict, "ymax", PyFloat_FromDouble(g->ymax));
+    ADD_TO_DICT(grid_dict, "zmin", PyFloat_FromDouble(g->zmin));
+    ADD_TO_DICT(grid_dict, "zmax", PyFloat_FromDouble(g->zmax));
 
     #undef ADD_TO_DICT
 
@@ -363,6 +387,29 @@ static PyObject* create_grid(PyObject* self, PyObject* args) {
     PyDict_SetItemString(grid_dict, "y_coords", y_list);
     Py_DECREF(x_list);
     Py_DECREF(y_list);
+
+    // Add z coordinates when 3D
+    if (g->nz > 1 && g->z != NULL) {
+        PyObject* z_list = PyList_New(0);
+        if (z_list == NULL) {
+            Py_DECREF(grid_dict);
+            grid_destroy(g);
+            return NULL;
+        }
+        for (size_t i = 0; i < g->nz; i++) {
+            PyObject* val = PyFloat_FromDouble(g->z[i]);
+            if (val == NULL || PyList_Append(z_list, val) < 0) {
+                Py_XDECREF(val);
+                Py_DECREF(z_list);
+                Py_DECREF(grid_dict);
+                grid_destroy(g);
+                return NULL;
+            }
+            Py_DECREF(val);
+        }
+        PyDict_SetItemString(grid_dict, "z_coords", z_list);
+        Py_DECREF(z_list);
+    }
 
     grid_destroy(g);
     return grid_dict;
@@ -423,9 +470,9 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
 
     simulation_data* sim_data;
     if (solver_type) {
-        sim_data = init_simulation_with_solver(nx, ny, xmin, xmax, ymin, ymax, solver_type);
+        sim_data = init_simulation_with_solver(nx, ny, 1, xmin, xmax, ymin, ymax, 0.0, 0.0, solver_type);
     } else {
-        sim_data = init_simulation(nx, ny, xmin, xmax, ymin, ymax);
+        sim_data = init_simulation(nx, ny, 1, xmin, xmax, ymin, ymax, 0.0, 0.0);
     }
 
     if (sim_data == NULL) {
@@ -455,7 +502,7 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
 
     // Compute velocity magnitude using derived_fields
     flow_field* field = sim_data->field;
-    derived_fields* derived = derived_fields_create(field->nx, field->ny);
+    derived_fields* derived = derived_fields_create(field->nx, field->ny, field->nz);
     if (derived != NULL) {
         derived_fields_compute_velocity_magnitude(derived, field);
 
@@ -540,9 +587,10 @@ static PyObject* run_simulation_with_params(PyObject* self, PyObject* args, PyOb
     // Write output if requested
     if (output_file) {
         write_vtk_flow_field(output_file, sim_data->field,
-                            sim_data->grid->nx, sim_data->grid->ny,
+                            sim_data->grid->nx, sim_data->grid->ny, sim_data->grid->nz,
                             sim_data->grid->xmin, sim_data->grid->xmax,
-                            sim_data->grid->ymin, sim_data->grid->ymax);
+                            sim_data->grid->ymin, sim_data->grid->ymax,
+                            sim_data->grid->zmin, sim_data->grid->zmax);
         PyObject* output_str = PyUnicode_FromString(output_file);
         if (output_str != NULL) {
             PyDict_SetItemString(results, "output_file", output_str);
@@ -578,17 +626,21 @@ static PyObject* set_output_dir(PyObject* self, PyObject* args) {
  */
 static PyObject* write_vtk_scalar(PyObject* self, PyObject* args, PyObject* kwds) {
     (void)self;
-    static char* kwlist[] = {"filename", "field_name", "data", "nx", "ny",
-                             "xmin", "xmax", "ymin", "ymax", NULL};
+    static const char* const kwlist[] = {"filename", "field_name", "data", "nx", "ny",
+                                         "xmin", "xmax", "ymin", "ymax",
+                                         "nz", "zmin", "zmax", NULL};
     const char* filename;
     const char* field_name;
     PyObject* data_list;
     size_t nx, ny;
+    size_t nz = 1;
     double xmin, xmax, ymin, ymax;
+    double zmin = 0.0, zmax = 0.0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssOnndddd", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssOnndddd|ndd", (char**)kwlist,
                                      &filename, &field_name, &data_list,
-                                     &nx, &ny, &xmin, &xmax, &ymin, &ymax)) {
+                                     &nx, &ny, &xmin, &xmax, &ymin, &ymax,
+                                     &nz, &zmin, &zmax)) {
         return NULL;
     }
 
@@ -598,9 +650,9 @@ static PyObject* write_vtk_scalar(PyObject* self, PyObject* args, PyObject* kwds
         return NULL;
     }
 
-    size_t size = nx * ny;
+    size_t size = nx * ny * nz;
     if ((size_t)PyList_Size(data_list) != size) {
-        PyErr_Format(PyExc_ValueError, "data list size (%zd) must match nx*ny (%zu)",
+        PyErr_Format(PyExc_ValueError, "data list size (%zd) must match nx*ny*nz (%zu)",
                      PyList_Size(data_list), size);
         return NULL;
     }
@@ -624,7 +676,7 @@ static PyObject* write_vtk_scalar(PyObject* self, PyObject* args, PyObject* kwds
         }
     }
 
-    write_vtk_output(filename, field_name, data, nx, ny, xmin, xmax, ymin, ymax);
+    write_vtk_output(filename, field_name, data, nx, ny, nz, xmin, xmax, ymin, ymax, zmin, zmax);
     free(data);
 
     Py_RETURN_NONE;
@@ -635,18 +687,23 @@ static PyObject* write_vtk_scalar(PyObject* self, PyObject* args, PyObject* kwds
  */
 static PyObject* write_vtk_vector(PyObject* self, PyObject* args, PyObject* kwds) {
     (void)self;
-    static char* kwlist[] = {"filename", "field_name", "u_data", "v_data", "nx", "ny",
-                             "xmin", "xmax", "ymin", "ymax", NULL};
+    static const char* const kwlist[] = {"filename", "field_name", "u_data", "v_data", "nx", "ny",
+                                         "xmin", "xmax", "ymin", "ymax",
+                                         "w_data", "nz", "zmin", "zmax", NULL};
     const char* filename;
     const char* field_name;
     PyObject* u_list;
     PyObject* v_list;
+    PyObject* w_list = NULL;
     size_t nx, ny;
+    size_t nz = 1;
     double xmin, xmax, ymin, ymax;
+    double zmin = 0.0, zmax = 0.0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssOOnndddd", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ssOOnndddd|Ondd", (char**)kwlist,
                                      &filename, &field_name, &u_list, &v_list,
-                                     &nx, &ny, &xmin, &xmax, &ymin, &ymax)) {
+                                     &nx, &ny, &xmin, &xmax, &ymin, &ymax,
+                                     &w_list, &nz, &zmin, &zmax)) {
         return NULL;
     }
 
@@ -656,20 +713,38 @@ static PyObject* write_vtk_vector(PyObject* self, PyObject* args, PyObject* kwds
         return NULL;
     }
 
-    size_t size = nx * ny;
-    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
-        PyErr_SetString(PyExc_ValueError, "data list sizes must match nx*ny");
+    // Treat None as no w_data
+    if (w_list == Py_None) {
+        w_list = NULL;
+    }
+
+    if (w_list != NULL && !PyList_Check(w_list)) {
+        PyErr_SetString(PyExc_TypeError, "w_data must be a list or None");
         return NULL;
     }
 
-    double* u_data = NULL;
-    double* v_data = NULL;
+    size_t size = nx * ny * nz;
+    if ((size_t)PyList_Size(u_list) != size || (size_t)PyList_Size(v_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "data list sizes must match nx*ny*nz");
+        return NULL;
+    }
 
-    u_data = (double*)malloc(size * sizeof(double));
-    v_data = (double*)malloc(size * sizeof(double));
-    if (u_data == NULL || v_data == NULL) {
+    if (w_list != NULL && (size_t)PyList_Size(w_list) != size) {
+        PyErr_SetString(PyExc_ValueError, "w_data size must match nx*ny*nz");
+        return NULL;
+    }
+
+    double* u_data = (double*)malloc(size * sizeof(double));
+    double* v_data = (double*)malloc(size * sizeof(double));
+    double* w_data = NULL;
+    if (w_list != NULL) {
+        w_data = (double*)malloc(size * sizeof(double));
+    }
+
+    if (u_data == NULL || v_data == NULL || (w_list != NULL && w_data == NULL)) {
         free(u_data);
         free(v_data);
+        free(w_data);
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate data arrays");
         return NULL;
     }
@@ -680,20 +755,34 @@ static PyObject* write_vtk_vector(PyObject* self, PyObject* args, PyObject* kwds
         if (u_item == NULL || v_item == NULL) {
             free(u_data);
             free(v_data);
+            free(w_data);
             return NULL;
         }
         u_data[i] = PyFloat_AsDouble(u_item);
         v_data[i] = PyFloat_AsDouble(v_item);
+        if (w_list != NULL) {
+            PyObject* w_item = PyList_GetItem(w_list, i);
+            if (w_item == NULL) {
+                free(u_data);
+                free(v_data);
+                free(w_data);
+                return NULL;
+            }
+            w_data[i] = PyFloat_AsDouble(w_item);
+        }
         if (PyErr_Occurred()) {
             free(u_data);
             free(v_data);
+            free(w_data);
             return NULL;
         }
     }
 
-    write_vtk_vector_output(filename, field_name, u_data, v_data, nx, ny, xmin, xmax, ymin, ymax);
+    write_vtk_vector_output(filename, field_name, u_data, v_data, w_data,
+                            nx, ny, nz, xmin, xmax, ymin, ymax, zmin, zmax);
     free(u_data);
     free(v_data);
+    free(w_data);
 
     Py_RETURN_NONE;
 }
@@ -736,7 +825,7 @@ static PyObject* write_csv_timeseries_py(PyObject* self, PyObject* args, PyObjec
     }
 
     // Allocate and populate flow field
-    flow_field* field = flow_field_create(nx, ny);
+    flow_field* field = flow_field_create(nx, ny, 1);
     if (field == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
         return NULL;
@@ -1151,7 +1240,7 @@ static PyObject* create_grid_stretched_py(PyObject* self, PyObject* args) {
     size_t nx = (size_t)nx_signed;
     size_t ny = (size_t)ny_signed;
 
-    grid* g = grid_create(nx, ny, xmin, xmax, ymin, ymax);
+    grid* g = grid_create(nx, ny, 1, xmin, xmax, ymin, ymax, 0.0, 0.0);
     if (g == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to create grid");
         return NULL;
@@ -2009,7 +2098,7 @@ static PyObject* compute_velocity_magnitude_py(PyObject* self, PyObject* args) {
     }
 
     // Create a temporary flow_field structure
-    flow_field* field = flow_field_create(nx, ny);
+    flow_field* field = flow_field_create(nx, ny, 1);
     if (field == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
         return NULL;
@@ -2026,7 +2115,7 @@ static PyObject* compute_velocity_magnitude_py(PyObject* self, PyObject* args) {
     }
 
     // Create derived fields and compute velocity magnitude
-    derived_fields* derived = derived_fields_create(nx, ny);
+    derived_fields* derived = derived_fields_create(nx, ny, 1);
     if (derived == NULL) {
         flow_field_destroy(field);
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate derived fields");
@@ -2095,7 +2184,7 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
     }
 
     // Create a temporary flow_field structure
-    flow_field* field = flow_field_create(nx, ny);
+    flow_field* field = flow_field_create(nx, ny, 1);
     if (field == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate flow field");
         return NULL;
@@ -2113,7 +2202,7 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
     }
 
     // Create derived fields and compute statistics
-    derived_fields* derived = derived_fields_create(nx, ny);
+    derived_fields* derived = derived_fields_create(nx, ny, 1);
     if (derived == NULL) {
         flow_field_destroy(field);
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate derived fields");
@@ -2201,6 +2290,290 @@ static PyObject* compute_flow_statistics_py(PyObject* self, PyObject* args) {
 /*
  * Module definition
  */
+// ============================================================================
+// Library Lifecycle API (v0.2.0)
+// ============================================================================
+
+static PyObject* init_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    cfd_status_t status = cfd_init();
+    if (status != CFD_SUCCESS) {
+        return raise_cfd_error(status, "cfd_init");
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject* finalize_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    cfd_finalize();
+    Py_RETURN_NONE;
+}
+
+static PyObject* is_initialized_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    int result = cfd_is_initialized();
+    return PyBool_FromLong(result);
+}
+
+static PyObject* get_cfd_version_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    const char* version = cfd_get_version_string();
+    return PyUnicode_FromString(version);
+}
+
+// ============================================================================
+// Poisson Solver API (v0.2.0)
+// ============================================================================
+
+static PyObject* get_default_poisson_params_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    poisson_solver_params_t params = poisson_solver_params_default();
+
+    PyObject* dict = PyDict_New();
+    if (dict == NULL) return NULL;
+
+    #define ADD_POISSON_PARAM(key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_POISSON_PARAM("tolerance", PyFloat_FromDouble(params.tolerance));
+    ADD_POISSON_PARAM("absolute_tolerance", PyFloat_FromDouble(params.absolute_tolerance));
+    ADD_POISSON_PARAM("max_iterations", PyLong_FromLong(params.max_iterations));
+    ADD_POISSON_PARAM("omega", PyFloat_FromDouble(params.omega));
+    ADD_POISSON_PARAM("check_interval", PyLong_FromLong(params.check_interval));
+    ADD_POISSON_PARAM("verbose", PyBool_FromLong(params.verbose));
+    ADD_POISSON_PARAM("preconditioner", PyLong_FromLong((long)params.preconditioner));
+
+    #undef ADD_POISSON_PARAM
+
+    return dict;
+}
+
+static PyObject* poisson_get_backend_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    poisson_solver_backend_t backend = poisson_solver_get_backend();
+    return PyLong_FromLong((long)backend);
+}
+
+static PyObject* poisson_get_backend_name_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    const char* name = poisson_solver_get_backend_name();
+    return PyUnicode_FromString(name);
+}
+
+static PyObject* poisson_set_backend_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    bool success = poisson_solver_set_backend((poisson_solver_backend_t)backend);
+    return PyBool_FromLong(success);
+}
+
+static PyObject* poisson_backend_available_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int backend;
+
+    if (!PyArg_ParseTuple(args, "i", &backend)) {
+        return NULL;
+    }
+
+    bool available = poisson_solver_backend_available((poisson_solver_backend_t)backend);
+    return PyBool_FromLong(available);
+}
+
+static PyObject* poisson_simd_available_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    bool available = poisson_solver_simd_available();
+    return PyBool_FromLong(available);
+}
+
+// ============================================================================
+// GPU Device API (v0.2.0)
+// ============================================================================
+
+static PyObject* gpu_is_available_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    int available = gpu_is_available();
+    return PyBool_FromLong(available);
+}
+
+static PyObject* gpu_get_device_info_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    gpu_device_info_t devices[8];
+    int count = gpu_get_device_info(devices, 8);
+
+    PyObject* list = PyList_New(0);
+    if (list == NULL) return NULL;
+
+    for (int i = 0; i < count; i++) {
+        PyObject* info = PyDict_New();
+        if (info == NULL) {
+            Py_DECREF(list);
+            return NULL;
+        }
+
+        #define ADD_GPU_INFO(key, py_val) do { \
+            PyObject* tmp = (py_val); \
+            if (tmp == NULL) { Py_DECREF(info); Py_DECREF(list); return NULL; } \
+            PyDict_SetItemString(info, key, tmp); \
+            Py_DECREF(tmp); \
+        } while(0)
+
+        ADD_GPU_INFO("device_id", PyLong_FromLong(devices[i].device_id));
+        ADD_GPU_INFO("name", PyUnicode_FromString(devices[i].name));
+        ADD_GPU_INFO("total_memory", PyLong_FromSize_t(devices[i].total_memory));
+        ADD_GPU_INFO("free_memory", PyLong_FromSize_t(devices[i].free_memory));
+        ADD_GPU_INFO("compute_capability_major", PyLong_FromLong(devices[i].compute_capability_major));
+        ADD_GPU_INFO("compute_capability_minor", PyLong_FromLong(devices[i].compute_capability_minor));
+        ADD_GPU_INFO("multiprocessor_count", PyLong_FromLong(devices[i].multiprocessor_count));
+        ADD_GPU_INFO("max_threads_per_block", PyLong_FromLong(devices[i].max_threads_per_block));
+        ADD_GPU_INFO("warp_size", PyLong_FromLong(devices[i].warp_size));
+        ADD_GPU_INFO("is_available", PyBool_FromLong(devices[i].is_available));
+
+        #undef ADD_GPU_INFO
+
+        if (PyList_Append(list, info) < 0) {
+            Py_DECREF(info);
+            Py_DECREF(list);
+            return NULL;
+        }
+        Py_DECREF(info);
+    }
+
+    return list;
+}
+
+static PyObject* gpu_select_device_py(PyObject* self, PyObject* args) {
+    (void)self;
+    int device_id;
+
+    if (!PyArg_ParseTuple(args, "i", &device_id)) {
+        return NULL;
+    }
+
+    cfd_status_t status = gpu_select_device(device_id);
+    if (status != CFD_SUCCESS) {
+        return raise_cfd_error(status, "gpu_select_device");
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject* gpu_get_default_config_py(PyObject* self, PyObject* args) {
+    (void)self;
+    (void)args;
+
+    gpu_config_t config = gpu_config_default();
+
+    PyObject* dict = PyDict_New();
+    if (dict == NULL) return NULL;
+
+    #define ADD_GPU_CONFIG(key, py_val) do { \
+        PyObject* tmp = (py_val); \
+        if (tmp == NULL) { Py_DECREF(dict); return NULL; } \
+        PyDict_SetItemString(dict, key, tmp); \
+        Py_DECREF(tmp); \
+    } while(0)
+
+    ADD_GPU_CONFIG("enable_gpu", PyBool_FromLong(config.enable_gpu));
+    ADD_GPU_CONFIG("min_grid_size", PyLong_FromSize_t(config.min_grid_size));
+    ADD_GPU_CONFIG("min_steps", PyLong_FromLong(config.min_steps));
+    ADD_GPU_CONFIG("block_size_x", PyLong_FromLong(config.block_size_x));
+    ADD_GPU_CONFIG("block_size_y", PyLong_FromLong(config.block_size_y));
+    ADD_GPU_CONFIG("poisson_max_iter", PyLong_FromLong(config.poisson_max_iter));
+    ADD_GPU_CONFIG("poisson_tolerance", PyFloat_FromDouble(config.poisson_tolerance));
+    ADD_GPU_CONFIG("persistent_memory", PyBool_FromLong(config.persistent_memory));
+    ADD_GPU_CONFIG("async_transfers", PyBool_FromLong(config.async_transfers));
+    ADD_GPU_CONFIG("sync_after_kernel", PyBool_FromLong(config.sync_after_kernel));
+    ADD_GPU_CONFIG("verbose", PyBool_FromLong(config.verbose));
+
+    #undef ADD_GPU_CONFIG
+
+    return dict;
+}
+
+// ============================================================================
+// Logging API (v0.2.0)
+// ============================================================================
+
+static PyObject* g_log_callback = NULL;
+
+static void python_log_callback(cfd_log_level_t level, const char* message) {
+    PyGILState_STATE gstate = PyGILState_Ensure();
+
+    if (g_log_callback != NULL && g_log_callback != Py_None) {
+        PyObject* args = PyTuple_New(2);
+        if (args != NULL) {
+            PyTuple_SetItem(args, 0, PyLong_FromLong((long)level));
+            PyTuple_SetItem(args, 1, PyUnicode_FromString(message));
+            PyObject* result = PyObject_CallObject(g_log_callback, args);
+            Py_XDECREF(result);
+            Py_DECREF(args);
+        }
+        if (PyErr_Occurred()) {
+            PyErr_Clear();
+        }
+    }
+
+    PyGILState_Release(gstate);
+}
+
+static PyObject* set_log_callback_py(PyObject* self, PyObject* args) {
+    (void)self;
+    PyObject* callback;
+
+    if (!PyArg_ParseTuple(args, "O", &callback)) {
+        return NULL;
+    }
+
+    if (callback == Py_None) {
+        Py_XDECREF(g_log_callback);
+        g_log_callback = NULL;
+        cfd_set_log_callback(NULL);
+        Py_RETURN_NONE;
+    }
+
+    if (!PyCallable_Check(callback)) {
+        PyErr_SetString(PyExc_TypeError, "callback must be callable or None");
+        return NULL;
+    }
+
+    Py_XDECREF(g_log_callback);
+    Py_INCREF(callback);
+    g_log_callback = callback;
+    cfd_set_log_callback(python_log_callback);
+
+    Py_RETURN_NONE;
+}
+
+// ============================================================================
+
 static PyMethodDef cfd_python_methods[] = {
     {"run_simulation", (PyCFunction)run_simulation, METH_VARARGS | METH_KEYWORDS,
      "Run a complete CFD simulation.\n\n"
@@ -2216,7 +2589,7 @@ static PyMethodDef cfd_python_methods[] = {
      "    output_file (str, optional): VTK output file path\n\n"
      "Returns:\n"
      "    list: Velocity magnitude values as a flat list"},
-    {"create_grid", create_grid, METH_VARARGS,
+    {"create_grid", (PyCFunction)create_grid, METH_VARARGS | METH_KEYWORDS,
      "Create a computational grid and return its properties.\n\n"
      "Args:\n"
      "    nx (int): Number of grid points in x direction\n"
@@ -2224,7 +2597,10 @@ static PyMethodDef cfd_python_methods[] = {
      "    xmin (float): Minimum x coordinate\n"
      "    xmax (float): Maximum x coordinate\n"
      "    ymin (float): Minimum y coordinate\n"
-     "    ymax (float): Maximum y coordinate\n\n"
+     "    ymax (float): Maximum y coordinate\n"
+     "    nz (int, optional): Grid points in z direction (default: 1)\n"
+     "    zmin (float, optional): Minimum z coordinate (default: 0.0)\n"
+     "    zmax (float, optional): Maximum z coordinate (default: 0.0)\n\n"
      "Returns:\n"
      "    dict: Grid properties including coordinates"},
     {"get_default_solver_params", get_default_solver_params, METH_NOARGS,
@@ -2473,6 +2849,75 @@ static PyMethodDef cfd_python_methods[] = {
      "Returns:\n"
      "    bool: True if any SIMD instruction set is available"},
     // Grid Initialization Variants (Phase 6)
+    // Library Lifecycle API (v0.2.0)
+    {"init", init_py, METH_NOARGS,
+     "Initialize the CFD library.\n\n"
+     "Raises:\n"
+     "    RuntimeError: If initialization fails"},
+    {"finalize", finalize_py, METH_NOARGS,
+     "Finalize and clean up the CFD library."},
+    {"is_initialized", is_initialized_py, METH_NOARGS,
+     "Check if the CFD library is initialized.\n\n"
+     "Returns:\n"
+     "    bool: True if initialized"},
+    {"get_cfd_version", get_cfd_version_py, METH_NOARGS,
+     "Get the CFD C library version string.\n\n"
+     "Returns:\n"
+     "    str: Version string (e.g., '0.2.0')"},
+    // Poisson Solver API (v0.2.0)
+    {"get_default_poisson_params", get_default_poisson_params_py, METH_NOARGS,
+     "Get default Poisson solver parameters.\n\n"
+     "Returns:\n"
+     "    dict: Parameters (tolerance, absolute_tolerance, max_iterations, omega, etc.)"},
+    {"poisson_get_backend", poisson_get_backend_py, METH_NOARGS,
+     "Get the current Poisson solver backend.\n\n"
+     "Returns:\n"
+     "    int: Backend type (POISSON_BACKEND_*)"},
+    {"poisson_get_backend_name", poisson_get_backend_name_py, METH_NOARGS,
+     "Get the name of the current Poisson solver backend.\n\n"
+     "Returns:\n"
+     "    str: Backend name"},
+    {"poisson_set_backend", poisson_set_backend_py, METH_VARARGS,
+     "Set the Poisson solver backend.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    bool: True if backend was set successfully"},
+    {"poisson_backend_available", poisson_backend_available_py, METH_VARARGS,
+     "Check if a Poisson solver backend is available.\n\n"
+     "Args:\n"
+     "    backend (int): Backend type constant\n\n"
+     "Returns:\n"
+     "    bool: True if available"},
+    {"poisson_simd_available", poisson_simd_available_py, METH_NOARGS,
+     "Check if SIMD-accelerated Poisson solver is available.\n\n"
+     "Returns:\n"
+     "    bool: True if SIMD Poisson solver is available"},
+    // GPU Device API (v0.2.0)
+    {"gpu_is_available", gpu_is_available_py, METH_NOARGS,
+     "Check if GPU acceleration is available.\n\n"
+     "Returns:\n"
+     "    bool: True if GPU is available"},
+    {"gpu_get_device_info", gpu_get_device_info_py, METH_NOARGS,
+     "Get information about available GPU devices.\n\n"
+     "Returns:\n"
+     "    list[dict]: Device info (name, memory, compute capability, etc.)"},
+    {"gpu_select_device", gpu_select_device_py, METH_VARARGS,
+     "Select a GPU device by ID.\n\n"
+     "Args:\n"
+     "    device_id (int): Device ID to select\n\n"
+     "Raises:\n"
+     "    RuntimeError: If device selection fails"},
+    {"gpu_get_default_config", gpu_get_default_config_py, METH_NOARGS,
+     "Get default GPU configuration.\n\n"
+     "Returns:\n"
+     "    dict: GPU config parameters"},
+    // Logging API (v0.2.0)
+    {"set_log_callback", set_log_callback_py, METH_VARARGS,
+     "Set a Python callback for CFD library log messages.\n\n"
+     "Args:\n"
+     "    callback (callable or None): Function(level: int, message: str). Pass None to clear."},
+    // Grid Initialization Variants
     {"create_grid_stretched", create_grid_stretched_py, METH_VARARGS,
      "Create a grid with stretched (non-uniform) spacing.\n\n"
      "WARNING: The current implementation has a known bug. The cosh-based formula\n"
@@ -2496,7 +2941,7 @@ static PyMethodDef cfd_python_methods[] = {
 static struct PyModuleDef cfd_python_module = {
     PyModuleDef_HEAD_INIT,
     "cfd_python",
-    "Python bindings for CFD simulation library v0.1.5+ with pluggable solver support.\n\n"
+    "Python bindings for CFD simulation library v0.2.0 with pluggable solver support.\n\n"
     "Available functions:\n"
     "  - list_solvers(): Get available solver types\n"
     "  - has_solver(name): Check if a solver exists\n"
@@ -2604,7 +3049,9 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         PyModule_AddIntConstant(m, "CFD_ERROR_IO", CFD_ERROR_IO) < 0 ||
         PyModule_AddIntConstant(m, "CFD_ERROR_UNSUPPORTED", CFD_ERROR_UNSUPPORTED) < 0 ||
         PyModule_AddIntConstant(m, "CFD_ERROR_DIVERGED", CFD_ERROR_DIVERGED) < 0 ||
-        PyModule_AddIntConstant(m, "CFD_ERROR_MAX_ITER", CFD_ERROR_MAX_ITER) < 0) {
+        PyModule_AddIntConstant(m, "CFD_ERROR_MAX_ITER", CFD_ERROR_MAX_ITER) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_LIMIT_EXCEEDED", CFD_ERROR_LIMIT_EXCEEDED) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_ERROR_NOT_FOUND", CFD_ERROR_NOT_FOUND) < 0) {
         Py_DECREF(m);
         return NULL;
     }
@@ -2615,7 +3062,8 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         PyModule_AddIntConstant(m, "BC_TYPE_DIRICHLET", BC_TYPE_DIRICHLET) < 0 ||
         PyModule_AddIntConstant(m, "BC_TYPE_NOSLIP", BC_TYPE_NOSLIP) < 0 ||
         PyModule_AddIntConstant(m, "BC_TYPE_INLET", BC_TYPE_INLET) < 0 ||
-        PyModule_AddIntConstant(m, "BC_TYPE_OUTLET", BC_TYPE_OUTLET) < 0) {
+        PyModule_AddIntConstant(m, "BC_TYPE_OUTLET", BC_TYPE_OUTLET) < 0 ||
+        PyModule_AddIntConstant(m, "BC_TYPE_SYMMETRY", BC_TYPE_SYMMETRY) < 0) {
         Py_DECREF(m);
         return NULL;
     }
@@ -2624,7 +3072,9 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
     if (PyModule_AddIntConstant(m, "BC_EDGE_LEFT", BC_EDGE_LEFT) < 0 ||
         PyModule_AddIntConstant(m, "BC_EDGE_RIGHT", BC_EDGE_RIGHT) < 0 ||
         PyModule_AddIntConstant(m, "BC_EDGE_BOTTOM", BC_EDGE_BOTTOM) < 0 ||
-        PyModule_AddIntConstant(m, "BC_EDGE_TOP", BC_EDGE_TOP) < 0) {
+        PyModule_AddIntConstant(m, "BC_EDGE_TOP", BC_EDGE_TOP) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_FRONT", 0x10) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_BACK", 0x20) < 0) {
         Py_DECREF(m);
         return NULL;
     }
@@ -2652,6 +3102,64 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
     if (PyModule_AddIntConstant(m, "SIMD_NONE", CFD_SIMD_NONE) < 0 ||
         PyModule_AddIntConstant(m, "SIMD_AVX2", CFD_SIMD_AVX2) < 0 ||
         PyModule_AddIntConstant(m, "SIMD_NEON", CFD_SIMD_NEON) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add version constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "CFD_VERSION_MAJOR", CFD_VERSION_MAJOR) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_VERSION_MINOR", CFD_VERSION_MINOR) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_VERSION_PATCH", CFD_VERSION_PATCH) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add Poisson solver method constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "POISSON_METHOD_JACOBI", POISSON_METHOD_JACOBI) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_GAUSS_SEIDEL", POISSON_METHOD_GAUSS_SEIDEL) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_SOR", POISSON_METHOD_SOR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_REDBLACK_SOR", POISSON_METHOD_REDBLACK_SOR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_CG", POISSON_METHOD_CG) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_BICGSTAB", POISSON_METHOD_BICGSTAB) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_METHOD_MULTIGRID", POISSON_METHOD_MULTIGRID) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add Poisson solver backend constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "POISSON_BACKEND_AUTO", POISSON_BACKEND_AUTO) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_BACKEND_SCALAR", POISSON_BACKEND_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_BACKEND_OMP", POISSON_BACKEND_OMP) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_BACKEND_SIMD", POISSON_BACKEND_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_BACKEND_GPU", POISSON_BACKEND_GPU) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add Poisson solver type preset constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "POISSON_SOLVER_SOR_SCALAR", POISSON_SOLVER_SOR_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_JACOBI_SIMD", POISSON_SOLVER_JACOBI_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_REDBLACK_SIMD", POISSON_SOLVER_REDBLACK_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_REDBLACK_OMP", POISSON_SOLVER_REDBLACK_OMP) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_REDBLACK_SCALAR", POISSON_SOLVER_REDBLACK_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_CG_SCALAR", POISSON_SOLVER_CG_SCALAR) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_CG_SIMD", POISSON_SOLVER_CG_SIMD) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_SOLVER_CG_OMP", POISSON_SOLVER_CG_OMP) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add Poisson preconditioner constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "POISSON_PRECOND_NONE", POISSON_PRECOND_NONE) < 0 ||
+        PyModule_AddIntConstant(m, "POISSON_PRECOND_JACOBI", POISSON_PRECOND_JACOBI) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    // Add log level constants (v0.2.0)
+    if (PyModule_AddIntConstant(m, "CFD_LOG_LEVEL_INFO", CFD_LOG_LEVEL_INFO) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_LOG_LEVEL_WARNING", CFD_LOG_LEVEL_WARNING) < 0 ||
+        PyModule_AddIntConstant(m, "CFD_LOG_LEVEL_ERROR", CFD_LOG_LEVEL_ERROR) < 0) {
         Py_DECREF(m);
         return NULL;
     }

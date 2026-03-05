@@ -23,6 +23,10 @@ def _check_extension_exists() -> bool:
 def load_extension():
     """Load the C extension module and return exports.
 
+    Auto-discovers all public symbols from the C extension via dir().
+    SOLVER_* constants are returned separately since they are dynamically
+    generated from the solver registry at import time.
+
     Returns:
         tuple: (exports_dict, solver_constants)
 
@@ -32,184 +36,17 @@ def load_extension():
     """
     try:
         from . import cfd_python as _cfd_module
-        from .cfd_python import (
-            BACKEND_CUDA,
-            BACKEND_OMP,
-            BACKEND_SCALAR,
-            BACKEND_SIMD,
-            BC_BACKEND_AUTO,
-            BC_BACKEND_CUDA,
-            BC_BACKEND_OMP,
-            BC_BACKEND_SCALAR,
-            BC_BACKEND_SIMD,
-            BC_EDGE_BOTTOM,
-            BC_EDGE_LEFT,
-            BC_EDGE_RIGHT,
-            BC_EDGE_TOP,
-            BC_TYPE_DIRICHLET,
-            BC_TYPE_INLET,
-            BC_TYPE_NEUMANN,
-            BC_TYPE_NOSLIP,
-            BC_TYPE_OUTLET,
-            BC_TYPE_PERIODIC,
-            CFD_ERROR,
-            CFD_ERROR_DIVERGED,
-            CFD_ERROR_INVALID,
-            CFD_ERROR_IO,
-            CFD_ERROR_MAX_ITER,
-            CFD_ERROR_NOMEM,
-            CFD_ERROR_UNSUPPORTED,
-            CFD_SUCCESS,
-            OUTPUT_CSV_CENTERLINE,
-            OUTPUT_CSV_STATISTICS,
-            OUTPUT_CSV_TIMESERIES,
-            OUTPUT_FULL_FIELD,
-            OUTPUT_VELOCITY,
-            OUTPUT_VELOCITY_MAGNITUDE,
-            SIMD_AVX2,
-            SIMD_NEON,
-            SIMD_NONE,
-            backend_get_name,
-            backend_is_available,
-            bc_apply_dirichlet,
-            bc_apply_inlet_parabolic,
-            bc_apply_inlet_uniform,
-            bc_apply_noslip,
-            bc_apply_outlet_scalar,
-            bc_apply_outlet_velocity,
-            bc_apply_scalar,
-            bc_apply_velocity,
-            bc_backend_available,
-            bc_get_backend,
-            bc_get_backend_name,
-            bc_set_backend,
-            calculate_field_stats,
-            clear_error,
-            compute_flow_statistics,
-            compute_velocity_magnitude,
-            create_grid,
-            create_grid_stretched,
-            get_available_backends,
-            get_default_solver_params,
-            get_error_string,
-            get_last_error,
-            get_last_status,
-            get_simd_arch,
-            get_simd_name,
-            get_solver_info,
-            has_avx2,
-            has_neon,
-            has_simd,
-            has_solver,
-            list_solvers,
-            list_solvers_by_backend,
-            run_simulation,
-            run_simulation_with_params,
-            set_output_dir,
-            write_csv_timeseries,
-            write_vtk_scalar,
-            write_vtk_vector,
-        )
 
-        # Collect all exports
-        exports = {
-            # Simulation functions
-            "run_simulation": run_simulation,
-            "run_simulation_with_params": run_simulation_with_params,
-            "create_grid": create_grid,
-            "get_default_solver_params": get_default_solver_params,
-            # Solver functions
-            "list_solvers": list_solvers,
-            "has_solver": has_solver,
-            "get_solver_info": get_solver_info,
-            # Output functions
-            "set_output_dir": set_output_dir,
-            "write_vtk_scalar": write_vtk_scalar,
-            "write_vtk_vector": write_vtk_vector,
-            "write_csv_timeseries": write_csv_timeseries,
-            # Output type constants
-            "OUTPUT_VELOCITY": OUTPUT_VELOCITY,
-            "OUTPUT_VELOCITY_MAGNITUDE": OUTPUT_VELOCITY_MAGNITUDE,
-            "OUTPUT_FULL_FIELD": OUTPUT_FULL_FIELD,
-            "OUTPUT_CSV_TIMESERIES": OUTPUT_CSV_TIMESERIES,
-            "OUTPUT_CSV_CENTERLINE": OUTPUT_CSV_CENTERLINE,
-            "OUTPUT_CSV_STATISTICS": OUTPUT_CSV_STATISTICS,
-            # Error handling API
-            "CFD_SUCCESS": CFD_SUCCESS,
-            "CFD_ERROR": CFD_ERROR,
-            "CFD_ERROR_NOMEM": CFD_ERROR_NOMEM,
-            "CFD_ERROR_INVALID": CFD_ERROR_INVALID,
-            "CFD_ERROR_IO": CFD_ERROR_IO,
-            "CFD_ERROR_UNSUPPORTED": CFD_ERROR_UNSUPPORTED,
-            "CFD_ERROR_DIVERGED": CFD_ERROR_DIVERGED,
-            "CFD_ERROR_MAX_ITER": CFD_ERROR_MAX_ITER,
-            "get_last_error": get_last_error,
-            "get_last_status": get_last_status,
-            "get_error_string": get_error_string,
-            "clear_error": clear_error,
-            # Boundary condition type constants
-            "BC_TYPE_PERIODIC": BC_TYPE_PERIODIC,
-            "BC_TYPE_NEUMANN": BC_TYPE_NEUMANN,
-            "BC_TYPE_DIRICHLET": BC_TYPE_DIRICHLET,
-            "BC_TYPE_NOSLIP": BC_TYPE_NOSLIP,
-            "BC_TYPE_INLET": BC_TYPE_INLET,
-            "BC_TYPE_OUTLET": BC_TYPE_OUTLET,
-            # Boundary edge constants
-            "BC_EDGE_LEFT": BC_EDGE_LEFT,
-            "BC_EDGE_RIGHT": BC_EDGE_RIGHT,
-            "BC_EDGE_BOTTOM": BC_EDGE_BOTTOM,
-            "BC_EDGE_TOP": BC_EDGE_TOP,
-            # Boundary condition backend constants
-            "BC_BACKEND_AUTO": BC_BACKEND_AUTO,
-            "BC_BACKEND_SCALAR": BC_BACKEND_SCALAR,
-            "BC_BACKEND_OMP": BC_BACKEND_OMP,
-            "BC_BACKEND_SIMD": BC_BACKEND_SIMD,
-            "BC_BACKEND_CUDA": BC_BACKEND_CUDA,
-            # Boundary condition functions
-            "bc_get_backend": bc_get_backend,
-            "bc_get_backend_name": bc_get_backend_name,
-            "bc_set_backend": bc_set_backend,
-            "bc_backend_available": bc_backend_available,
-            "bc_apply_scalar": bc_apply_scalar,
-            "bc_apply_velocity": bc_apply_velocity,
-            "bc_apply_dirichlet": bc_apply_dirichlet,
-            "bc_apply_noslip": bc_apply_noslip,
-            "bc_apply_inlet_uniform": bc_apply_inlet_uniform,
-            "bc_apply_inlet_parabolic": bc_apply_inlet_parabolic,
-            "bc_apply_outlet_scalar": bc_apply_outlet_scalar,
-            "bc_apply_outlet_velocity": bc_apply_outlet_velocity,
-            # Derived fields API (Phase 3)
-            "calculate_field_stats": calculate_field_stats,
-            "compute_velocity_magnitude": compute_velocity_magnitude,
-            "compute_flow_statistics": compute_flow_statistics,
-            # Solver backend constants (v0.1.6)
-            "BACKEND_SCALAR": BACKEND_SCALAR,
-            "BACKEND_SIMD": BACKEND_SIMD,
-            "BACKEND_OMP": BACKEND_OMP,
-            "BACKEND_CUDA": BACKEND_CUDA,
-            # Solver backend availability functions (v0.1.6)
-            "backend_is_available": backend_is_available,
-            "backend_get_name": backend_get_name,
-            "list_solvers_by_backend": list_solvers_by_backend,
-            "get_available_backends": get_available_backends,
-            # CPU Features API (Phase 6)
-            "SIMD_NONE": SIMD_NONE,
-            "SIMD_AVX2": SIMD_AVX2,
-            "SIMD_NEON": SIMD_NEON,
-            "get_simd_arch": get_simd_arch,
-            "get_simd_name": get_simd_name,
-            "has_avx2": has_avx2,
-            "has_neon": has_neon,
-            "has_simd": has_simd,
-            # Grid initialization variants (Phase 6)
-            "create_grid_stretched": create_grid_stretched,
-        }
-
-        # Collect dynamic SOLVER_* constants
-        solver_constants = {}
+        # Auto-collect all public symbols from the C extension
+        exports = {}
         for name in dir(_cfd_module):
-            if name.startswith("SOLVER_"):
-                solver_constants[name] = getattr(_cfd_module, name)
+            if not name.startswith("_"):
+                exports[name] = getattr(_cfd_module, name)
+
+        # Separate SOLVER_* constants (dynamically generated from registry)
+        solver_constants = {k: v for k, v in exports.items() if k.startswith("SOLVER_")}
+        for k in solver_constants:
+            del exports[k]
 
         return exports, solver_constants
 
