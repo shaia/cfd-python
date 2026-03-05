@@ -3080,8 +3080,8 @@ PyMODINIT_FUNC PyInit_cfd_python(void) {
         PyModule_AddIntConstant(m, "BC_EDGE_RIGHT", BC_EDGE_RIGHT) < 0 ||
         PyModule_AddIntConstant(m, "BC_EDGE_BOTTOM", BC_EDGE_BOTTOM) < 0 ||
         PyModule_AddIntConstant(m, "BC_EDGE_TOP", BC_EDGE_TOP) < 0 ||
-        PyModule_AddIntConstant(m, "BC_EDGE_FRONT", 0x10) < 0 ||
-        PyModule_AddIntConstant(m, "BC_EDGE_BACK", 0x20) < 0) {
+        PyModule_AddIntConstant(m, "BC_EDGE_FRONT", BC_EDGE_FRONT) < 0 ||
+        PyModule_AddIntConstant(m, "BC_EDGE_BACK", BC_EDGE_BACK) < 0) {
         Py_DECREF(m);
         return NULL;
     }
