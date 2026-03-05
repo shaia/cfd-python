@@ -2528,14 +2528,10 @@ static void python_log_callback(cfd_log_level_t level, const char* message) {
     PyGILState_STATE gstate = PyGILState_Ensure();
 
     if (g_log_callback != NULL && g_log_callback != Py_None) {
-        PyObject* args = PyTuple_New(2);
-        if (args != NULL) {
-            PyTuple_SetItem(args, 0, PyLong_FromLong((long)level));
-            PyTuple_SetItem(args, 1, PyUnicode_FromString(message));
-            PyObject* result = PyObject_CallObject(g_log_callback, args);
-            Py_XDECREF(result);
-            Py_DECREF(args);
-        }
+        const char* safe_message = (message != NULL) ? message : "";
+        PyObject* result = PyObject_CallFunction(
+            g_log_callback, "is", (int)level, safe_message);
+        Py_XDECREF(result);
         if (PyErr_Occurred()) {
             PyErr_Clear();
         }
