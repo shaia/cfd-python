@@ -23,6 +23,11 @@ class TestBCTypeConstants:
         for const_name in bc_types:
             assert hasattr(cfd_python, const_name), f"Missing constant: {const_name}"
 
+    def test_bc_type_symmetry_exists(self):
+        """Test BC_TYPE_SYMMETRY constant is defined (v0.2.0)"""
+        assert hasattr(cfd_python, "BC_TYPE_SYMMETRY")
+        assert isinstance(cfd_python.BC_TYPE_SYMMETRY, int)
+
     def test_bc_type_constants_are_integers(self):
         """Test BC_TYPE_* constants are integers"""
         bc_types = [
@@ -64,6 +69,12 @@ class TestBCEdgeConstants:
         ]
         for const_name in bc_edges:
             assert hasattr(cfd_python, const_name), f"Missing constant: {const_name}"
+
+    def test_bc_3d_edge_constants_exist(self):
+        """Test BC_EDGE_FRONT and BC_EDGE_BACK constants (v0.2.0)"""
+        for name in ["BC_EDGE_FRONT", "BC_EDGE_BACK"]:
+            assert hasattr(cfd_python, name), f"Missing: {name}"
+            assert isinstance(getattr(cfd_python, name), int)
 
     def test_bc_edge_constants_are_integers(self):
         """Test BC_EDGE_* constants are integers"""
@@ -178,6 +189,14 @@ class TestBCBackendFunctions:
                 result, bool
             ), f"bc_backend_available should return bool for {backend}"
 
+    def test_bc_set_backend_invalid_returns_bool(self):
+        """Test setting an invalid backend returns a boolean"""
+        original = cfd_python.bc_get_backend()
+        result = cfd_python.bc_set_backend(9999)
+        assert isinstance(result, bool)
+        # Restore original backend
+        cfd_python.bc_set_backend(original)
+
 
 class TestBCApplyScalar:
     """Test bc_apply_scalar function"""
@@ -236,6 +255,13 @@ class TestBCApplyVelocity:
         result = cfd_python.bc_apply_velocity(u, v, nx, ny, cfd_python.BC_TYPE_PERIODIC)
         assert result is None
 
+    def test_bc_apply_velocity_invalid_size_raises(self):
+        """Test bc_apply_velocity with mismatched u size raises error"""
+        u = [0.0] * 6  # Wrong size for 4x4
+        v = [0.0] * 16
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_velocity(u, v, 4, 4, cfd_python.BC_TYPE_NEUMANN)
+
 
 class TestBCApplyDirichlet:
     """Test bc_apply_dirichlet function"""
@@ -265,6 +291,12 @@ class TestBCApplyDirichlet:
         # Top boundary (row ny-1) - full row including corners
         for i in range(nx):
             assert field[(ny - 1) * nx + i] == top, f"Top boundary at col {i}"
+
+    def test_bc_apply_dirichlet_invalid_size_raises(self):
+        """Test bc_apply_dirichlet with mismatched size raises error"""
+        field = [0.0] * 6  # Wrong size for 4x4
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_dirichlet(field, 4, 4, 1.0, 2.0, 3.0, 4.0)
 
 
 class TestBCApplyNoslip:
@@ -304,6 +336,13 @@ class TestBCApplyNoslip:
             idx = (ny - 1) * nx + i
             assert u[idx] == 0.0, f"u top boundary at {i}"
             assert v[idx] == 0.0, f"v top boundary at {i}"
+
+    def test_bc_apply_noslip_invalid_size_raises(self):
+        """Test bc_apply_noslip with mismatched u size raises error"""
+        u = [0.0] * 6  # Wrong size for 4x4
+        v = [0.0] * 16
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_noslip(u, v, 4, 4)
 
 
 class TestBCApplyInlet:
@@ -350,6 +389,38 @@ class TestBCApplyInlet:
         assert left_u[ny // 2] >= left_u[0], "Parabolic profile should peak near center"
         assert left_u[ny // 2] >= left_u[ny - 1], "Parabolic profile should peak near center"
 
+    def test_bc_apply_inlet_uniform_invalid_size_raises(self):
+        """Test bc_apply_inlet_uniform with mismatched size raises error"""
+        u = [0.0] * 6  # Wrong size for 4x4
+        v = [0.0] * 16
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_inlet_uniform(u, v, 4, 4, 1.0, 0.0, cfd_python.BC_EDGE_LEFT)
+
+    def test_bc_apply_inlet_parabolic_invalid_size_raises(self):
+        """Test bc_apply_inlet_parabolic with mismatched size raises error"""
+        u = [0.0] * 6  # Wrong size for 4x4
+        v = [0.0] * 16
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_inlet_parabolic(u, v, 4, 4, 1.0, cfd_python.BC_EDGE_LEFT)
+
+    @pytest.mark.parametrize(
+        "edge",
+        [
+            cfd_python.BC_EDGE_LEFT,
+            cfd_python.BC_EDGE_RIGHT,
+            cfd_python.BC_EDGE_BOTTOM,
+            cfd_python.BC_EDGE_TOP,
+        ],
+    )
+    def test_bc_apply_inlet_uniform_all_edges(self, edge):
+        """Test uniform inlet works on all edges"""
+        nx, ny = 6, 6
+        size = nx * ny
+        u = [0.0] * size
+        v = [0.0] * size
+        result = cfd_python.bc_apply_inlet_uniform(u, v, nx, ny, 1.0, 0.0, edge)
+        assert result is None
+
 
 class TestBCApplyOutlet:
     """Test outlet boundary condition functions"""
@@ -389,6 +460,58 @@ class TestBCApplyOutlet:
             assert u[boundary_idx] == u[interior_idx], f"u outlet should copy interior at row {j}"
             assert v[boundary_idx] == v[interior_idx], f"v outlet should copy interior at row {j}"
 
+    def test_bc_apply_outlet_scalar_invalid_size_raises(self):
+        """Test bc_apply_outlet_scalar with mismatched size raises error"""
+        field = [0.0] * 6  # Wrong size for 4x4
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_outlet_scalar(field, 4, 4, cfd_python.BC_EDGE_RIGHT)
+
+    def test_bc_apply_outlet_velocity_invalid_size_raises(self):
+        """Test bc_apply_outlet_velocity with mismatched u size raises error"""
+        u = [0.0] * 6  # Wrong size for 4x4
+        v = [0.0] * 16
+        with pytest.raises(ValueError):
+            cfd_python.bc_apply_outlet_velocity(u, v, 4, 4, cfd_python.BC_EDGE_RIGHT)
+
+    @pytest.mark.parametrize(
+        "edge",
+        [
+            cfd_python.BC_EDGE_LEFT,
+            cfd_python.BC_EDGE_RIGHT,
+            cfd_python.BC_EDGE_BOTTOM,
+            cfd_python.BC_EDGE_TOP,
+        ],
+    )
+    def test_bc_apply_outlet_scalar_all_edges(self, edge):
+        """Test outlet scalar works on all edges"""
+        nx, ny = 6, 6
+        field = [float(i) for i in range(nx * ny)]
+        result = cfd_python.bc_apply_outlet_scalar(field, nx, ny, edge)
+        assert result is None
+
+
+class TestBCStress:
+    """Stress tests for boundary condition functions."""
+
+    def test_bc_apply_scalar_repeated_calls(self):
+        """Verify no crashes or leaks under repeated bc_apply_scalar calls."""
+        for _ in range(100):
+            field = [1.0] * 16
+            cfd_python.bc_apply_scalar(field, 4, 4, cfd_python.BC_TYPE_NEUMANN)
+
+    def test_bc_apply_velocity_repeated_calls(self):
+        """Verify no crashes or leaks under repeated bc_apply_velocity calls."""
+        for _ in range(100):
+            u = [1.0] * 16
+            v = [0.5] * 16
+            cfd_python.bc_apply_velocity(u, v, 4, 4, cfd_python.BC_TYPE_NEUMANN)
+
+    def test_bc_apply_dirichlet_repeated_calls(self):
+        """Verify no crashes or leaks under repeated bc_apply_dirichlet calls."""
+        for _ in range(100):
+            field = [0.0] * 16
+            cfd_python.bc_apply_dirichlet(field, 4, 4, 1.0, 2.0, 3.0, 4.0)
+
 
 class TestBCFunctionsExported:
     """Test that all BC functions are properly exported"""
@@ -423,11 +546,16 @@ class TestBCFunctionsExported:
             "BC_TYPE_NOSLIP",
             "BC_TYPE_INLET",
             "BC_TYPE_OUTLET",
+            # v0.2.0
+            "BC_TYPE_SYMMETRY",
             # Edges
             "BC_EDGE_LEFT",
             "BC_EDGE_RIGHT",
             "BC_EDGE_BOTTOM",
             "BC_EDGE_TOP",
+            # v0.2.0
+            "BC_EDGE_FRONT",
+            "BC_EDGE_BACK",
             # Backends
             "BC_BACKEND_AUTO",
             "BC_BACKEND_SCALAR",

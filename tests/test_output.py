@@ -2,9 +2,35 @@
 Tests for VTK and CSV output functions
 """
 
+import os
+import tempfile
+
 import pytest
 
 import cfd_python
+
+# Check if write_csv_timeseries actually creates files
+_CSV_SKIP_REASON = (
+    "write_csv_timeseries not creating files - investigate CFD library implementation"
+)
+_CSV_WORKS = False
+
+with tempfile.TemporaryDirectory() as _td:
+    _tf = os.path.join(_td, "_probe.csv")
+    cfd_python.write_csv_timeseries(
+        _tf,
+        step=0,
+        time=0.0,
+        u_data=[0.0] * 4,
+        v_data=[0.0] * 4,
+        p_data=[0.0] * 4,
+        nx=2,
+        ny=2,
+        dt=0.001,
+        iterations=1,
+        create_new=True,
+    )
+    _CSV_WORKS = os.path.exists(_tf) and os.path.getsize(_tf) > 0
 
 
 class TestVTKOutput:
@@ -71,9 +97,7 @@ class TestVTKOutput:
             )
 
 
-@pytest.mark.skip(
-    reason="write_csv_timeseries not creating files - investigate CFD library implementation"
-)
+@pytest.mark.skipif(not _CSV_WORKS, reason=_CSV_SKIP_REASON)
 class TestCSVOutput:
     """Test CSV output functions"""
 
@@ -158,3 +182,8 @@ class TestSetOutputDir:
         """Test set_output_dir returns None"""
         result = cfd_python.set_output_dir(str(tmp_path))
         assert result is None
+
+    def test_set_output_dir_invalid_type_raises(self):
+        """Test set_output_dir with non-string raises TypeError"""
+        with pytest.raises(TypeError):
+            cfd_python.set_output_dir(123)

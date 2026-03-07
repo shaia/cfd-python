@@ -4,6 +4,8 @@ Tests for module-level attributes and exports
 
 import re
 
+import pytest
+
 import cfd_python
 
 
@@ -101,3 +103,19 @@ class TestAllExports:
         ]
         for const_name in output_constants:
             assert const_name in cfd_python.__all__, f"{const_name} should be in __all__"
+
+
+class TestCoreExportsCompleteness:
+    """Verify every symbol in _CORE_EXPORTS is actually exposed at runtime."""
+
+    @pytest.mark.parametrize("name", cfd_python._CORE_EXPORTS)
+    def test_core_export_accessible(self, name):
+        """Each _CORE_EXPORTS entry must be accessible via getattr."""
+        assert hasattr(
+            cfd_python, name
+        ), f"{name} is declared in _CORE_EXPORTS but not accessible on the module"
+
+    @pytest.mark.parametrize("name", cfd_python._CORE_EXPORTS)
+    def test_core_export_in_all(self, name):
+        """Each _CORE_EXPORTS entry must appear in __all__."""
+        assert name in cfd_python.__all__, f"{name} is in _CORE_EXPORTS but missing from __all__"

@@ -37,6 +37,25 @@ class TestGrid:
         assert len(grid["x_coords"]) == 5
         assert len(grid["y_coords"]) == 3
 
+    def test_create_grid_3d(self):
+        """Test create_grid with 3D parameters (nz > 1)"""
+        grid = cfd_python.create_grid(5, 5, 0.0, 1.0, 0.0, 1.0, nz=4, zmin=0.0, zmax=1.0)
+        assert isinstance(grid, dict)
+        assert grid["nz"] == 4
+        assert grid["zmin"] == 0.0
+        assert grid["zmax"] == 1.0
+
+    def test_create_grid_3d_has_z_coords(self):
+        """Test 3D grid has z_coords array"""
+        grid = cfd_python.create_grid(5, 5, 0.0, 1.0, 0.0, 1.0, nz=3, zmin=0.0, zmax=1.0)
+        assert "z_coords" in grid
+        assert len(grid["z_coords"]) == 3
+
+    def test_create_grid_default_nz_is_2d(self):
+        """Test that default nz=1 creates a 2D grid"""
+        grid = cfd_python.create_grid(5, 5, 0.0, 1.0, 0.0, 1.0)
+        assert grid["nz"] == 1
+
 
 class TestSolverParams:
     """Test solver parameters function"""
@@ -111,6 +130,12 @@ class TestRunSimulation:
         with pytest.raises(RuntimeError):
             cfd_python.run_simulation(5, 5, steps=3, solver_type="nonexistent_solver")
 
+    def test_run_simulation_minimum_grid(self):
+        """Test run_simulation with minimum valid grid size"""
+        result = cfd_python.run_simulation(3, 3, steps=1)
+        assert isinstance(result, list)
+        assert len(result) == 9
+
 
 class TestRunSimulationWithParams:
     """Test run_simulation_with_params function"""
@@ -161,3 +186,15 @@ class TestRunSimulationWithParams:
         )
         assert "output_file" in result
         assert output_file.exists()
+
+    def test_invalid_solver_raises(self):
+        """Test run_simulation_with_params with invalid solver raises error"""
+        with pytest.raises(RuntimeError):
+            cfd_python.run_simulation_with_params(
+                5, 5, 0.0, 1.0, 0.0, 1.0, solver_type="nonexistent_solver"
+            )
+
+    def test_invalid_nx_type_raises(self):
+        """Test run_simulation_with_params with non-int nx raises TypeError"""
+        with pytest.raises(TypeError):
+            cfd_python.run_simulation_with_params("five", 5, 0.0, 1.0, 0.0, 1.0)
