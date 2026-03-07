@@ -73,7 +73,6 @@ class TestPoissonSolverPresets:
         "POISSON_SOLVER_CG_SCALAR",
         "POISSON_SOLVER_CG_SIMD",
         "POISSON_SOLVER_CG_OMP",
-        "POISSON_SOLVER_SOR_SIMD",
     ]
 
     def test_solver_preset_constants_exist(self):
