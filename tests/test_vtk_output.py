@@ -5,6 +5,9 @@ These tests verify that the VTK output functions handle memory correctly,
 particularly the fixed use-after-free bug in write_vtk_vector.
 """
 
+import os
+import tempfile
+
 import pytest
 
 import cfd_python
@@ -14,28 +17,23 @@ _CSV_SKIP_REASON = (
     "write_csv_timeseries not creating files - investigate CFD library implementation"
 )
 _CSV_WORKS = False
-try:
-    import os
-    import tempfile
 
-    with tempfile.TemporaryDirectory() as _td:
-        _tf = os.path.join(_td, "_probe.csv")
-        cfd_python.write_csv_timeseries(
-            _tf,
-            step=0,
-            time=0.0,
-            u_data=[0.0] * 4,
-            v_data=[0.0] * 4,
-            p_data=[0.0] * 4,
-            nx=2,
-            ny=2,
-            dt=0.001,
-            iterations=1,
-            create_new=True,
-        )
-        _CSV_WORKS = os.path.exists(_tf) and os.path.getsize(_tf) > 0
-except Exception:
-    pass
+with tempfile.TemporaryDirectory() as _td:
+    _tf = os.path.join(_td, "_probe.csv")
+    cfd_python.write_csv_timeseries(
+        _tf,
+        step=0,
+        time=0.0,
+        u_data=[0.0] * 4,
+        v_data=[0.0] * 4,
+        p_data=[0.0] * 4,
+        nx=2,
+        ny=2,
+        dt=0.001,
+        iterations=1,
+        create_new=True,
+    )
+    _CSV_WORKS = os.path.exists(_tf) and os.path.getsize(_tf) > 0
 
 
 class TestWriteVtkScalar:
