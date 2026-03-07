@@ -1,10 +1,22 @@
 """Tests for library lifecycle and version functions (v0.2.0)."""
 
+import pytest
+
 import cfd_python
 
 
 class TestLibraryLifecycle:
     """Tests for init(), finalize(), is_initialized()."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_init_state(self):
+        """Snapshot and restore library init state so tests don't leak side-effects."""
+        was_initialized = cfd_python.is_initialized()
+        yield
+        if was_initialized:
+            cfd_python.init()
+        else:
+            cfd_python.finalize()
 
     def test_is_initialized_returns_bool(self):
         result = cfd_python.is_initialized()
