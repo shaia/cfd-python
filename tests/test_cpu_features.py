@@ -150,19 +150,17 @@ STRETCHED_GRID_BUG_REASON = (
 )
 
 
-_STRETCHED_GRID_BUGGY = False
-try:
-    _test_grid = cfd_python.create_grid_stretched(5, 5, 0.0, 1.0, 0.0, 1.0, 1.5)
-except Exception:
-    # Unexpected failure (missing symbol, type error, etc.) — let tests surface it
-    raise
-else:
+def _check_stretched_grid_buggy():
+    """Probe for the known stretched grid formula bug.
+
+    Returns True if the bug is present, False otherwise.
+    Raises on unexpected failures (missing symbol, type error, etc.).
+    """
+    grid = cfd_python.create_grid_stretched(5, 5, 0.0, 1.0, 0.0, 1.0, 1.5)
     # Bug: x_coords[-1] should be close to xmax, not xmin
-    if abs(_test_grid["x_coords"][-1] - _test_grid["xmax"]) > 0.1:
-        _STRETCHED_GRID_BUGGY = True
+    return abs(grid["x_coords"][-1] - grid["xmax"]) > 0.1
 
 
-@pytest.mark.skipif(_STRETCHED_GRID_BUGGY, reason=STRETCHED_GRID_BUG_REASON)
 class TestCreateGridStretched:
     """Test create_grid_stretched function.
 
@@ -179,6 +177,11 @@ class TestCreateGridStretched:
     - x[0] == xmin, x[n-1] == xmax (grid spans full domain)
     - Higher beta clusters points near BOUNDARIES (useful for boundary layers)
     """
+
+    @pytest.fixture(autouse=True)
+    def _skip_if_buggy(self):
+        if _check_stretched_grid_buggy():
+            pytest.skip(STRETCHED_GRID_BUG_REASON)
 
     def test_create_grid_stretched_basic(self):
         """Test basic stretched grid creation"""
