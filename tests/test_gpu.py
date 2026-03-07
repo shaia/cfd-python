@@ -44,12 +44,12 @@ class TestGPUFunctions:
         """Test gpu_select_device with invalid device ID."""
         # If no GPU available, selecting any device should fail or be a no-op
         if not cfd_python.gpu_is_available():
-            with pytest.raises((ValueError, RuntimeError)):
+            with pytest.raises(RuntimeError):
                 cfd_python.gpu_select_device(9999)
         else:
             # With GPU, very high ID should fail
             devices = cfd_python.gpu_get_device_info()
-            with pytest.raises((ValueError, RuntimeError)):
+            with pytest.raises(RuntimeError):
                 cfd_python.gpu_select_device(len(devices) + 100)
 
     def test_gpu_functions_in_all(self):
