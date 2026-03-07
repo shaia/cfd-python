@@ -117,6 +117,20 @@ class TestExceptionClasses:
         assert isinstance(err, cfd_python.CFDError)
         assert err.status_code == -7
 
+    def test_cfd_limit_exceeded_error_inheritance(self):
+        """Test CFDLimitExceededError inherits from both CFDError and ResourceWarning"""
+        err = cfd_python.CFDLimitExceededError("limit exceeded", -8)
+        assert isinstance(err, cfd_python.CFDError)
+        assert isinstance(err, ResourceWarning)
+        assert err.status_code == -8
+
+    def test_cfd_not_found_error_inheritance(self):
+        """Test CFDNotFoundError inherits from both CFDError and LookupError"""
+        err = cfd_python.CFDNotFoundError("not found", -9)
+        assert isinstance(err, cfd_python.CFDError)
+        assert isinstance(err, LookupError)
+        assert err.status_code == -9
+
 
 class TestRaiseForStatus:
     """Test raise_for_status function"""
@@ -168,6 +182,18 @@ class TestRaiseForStatus:
             cfd_python.raise_for_status(-7)
         assert exc_info.value.status_code == -7
 
+    def test_limit_exceeded_raises_cfd_limit_exceeded_error(self):
+        """Test that -8 raises CFDLimitExceededError"""
+        with pytest.raises(cfd_python.CFDLimitExceededError) as exc_info:
+            cfd_python.raise_for_status(-8)
+        assert exc_info.value.status_code == -8
+
+    def test_not_found_raises_cfd_not_found_error(self):
+        """Test that -9 raises CFDNotFoundError"""
+        with pytest.raises(cfd_python.CFDNotFoundError) as exc_info:
+            cfd_python.raise_for_status(-9)
+        assert exc_info.value.status_code == -9
+
     def test_unknown_error_raises_cfd_error(self):
         """Test that unknown negative codes raise CFDError"""
         with pytest.raises(cfd_python.CFDError) as exc_info:
@@ -194,8 +220,70 @@ class TestExceptionExports:
             "CFDUnsupportedError",
             "CFDDivergedError",
             "CFDMaxIterError",
+            "CFDLimitExceededError",
+            "CFDNotFoundError",
             "raise_for_status",
         ]
         for name in exceptions:
             assert name in cfd_python.__all__, f"{name} should be in __all__"
             assert hasattr(cfd_python, name), f"{name} should be accessible"
+
+
+class TestStatusConstants:
+    """Test CFD_SUCCESS and CFD_ERROR_* status code constants."""
+
+    _STATUS_CONSTANTS = [
+        ("CFD_SUCCESS", 0),
+        ("CFD_ERROR", -1),
+        ("CFD_ERROR_NOMEM", -2),
+        ("CFD_ERROR_INVALID", -3),
+        ("CFD_ERROR_IO", -4),
+        ("CFD_ERROR_UNSUPPORTED", -5),
+        ("CFD_ERROR_DIVERGED", -6),
+        ("CFD_ERROR_MAX_ITER", -7),
+    ]
+
+    _NEW_STATUS_CONSTANTS = [
+        ("CFD_ERROR_LIMIT_EXCEEDED", -8),
+        ("CFD_ERROR_NOT_FOUND", -9),
+    ]
+
+    def test_status_constants_exist(self):
+        for name, _ in self._STATUS_CONSTANTS:
+            assert hasattr(cfd_python, name), f"Missing constant: {name}"
+
+    def test_status_constants_are_integers(self):
+        for name, _ in self._STATUS_CONSTANTS:
+            assert isinstance(getattr(cfd_python, name), int)
+
+    def test_status_constants_values(self):
+        for name, expected in self._STATUS_CONSTANTS:
+            assert getattr(cfd_python, name) == expected, f"{name} should be {expected}"
+
+    def test_status_constants_in_all(self):
+        for name, _ in self._STATUS_CONSTANTS + self._NEW_STATUS_CONSTANTS:
+            assert name in cfd_python.__all__, f"{name} should be in __all__"
+
+    def test_new_status_constants_exist(self):
+        for name, _ in self._NEW_STATUS_CONSTANTS:
+            assert hasattr(cfd_python, name), f"Missing constant: {name}"
+
+    def test_new_status_constants_values(self):
+        for name, expected in self._NEW_STATUS_CONSTANTS:
+            assert getattr(cfd_python, name) == expected, f"{name} should be {expected}"
+
+
+class TestClearError:
+    """Test clear_error function."""
+
+    def test_clear_error_does_not_raise(self):
+        cfd_python.clear_error()
+
+    def test_clear_error_resets_last_status(self):
+        cfd_python.clear_error()
+        status = cfd_python.get_last_status()
+        assert status == 0
+
+    def test_clear_error_repeated_calls(self):
+        for _ in range(50):
+            cfd_python.clear_error()

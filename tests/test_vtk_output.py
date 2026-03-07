@@ -9,6 +9,34 @@ import pytest
 
 import cfd_python
 
+# Check if write_csv_timeseries actually creates files
+_CSV_SKIP_REASON = (
+    "write_csv_timeseries not creating files - investigate CFD library implementation"
+)
+_CSV_WORKS = False
+try:
+    import os
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as _td:
+        _tf = os.path.join(_td, "_probe.csv")
+        cfd_python.write_csv_timeseries(
+            _tf,
+            step=0,
+            time=0.0,
+            u_data=[0.0] * 4,
+            v_data=[0.0] * 4,
+            p_data=[0.0] * 4,
+            nx=2,
+            ny=2,
+            dt=0.001,
+            iterations=1,
+            create_new=True,
+        )
+        _CSV_WORKS = os.path.exists(_tf) and os.path.getsize(_tf) > 0
+except Exception:
+    pass
+
 
 class TestWriteVtkScalar:
     """Test the write_vtk_scalar function."""
@@ -271,9 +299,7 @@ class TestHasSolver:
         assert cfd_python.has_solver("") is False
 
 
-@pytest.mark.skip(
-    reason="write_csv_timeseries not creating files - investigate CFD library implementation"
-)
+@pytest.mark.skipif(not _CSV_WORKS, reason=_CSV_SKIP_REASON)
 class TestWriteCsvTimeseries:
     """Test the write_csv_timeseries function."""
 

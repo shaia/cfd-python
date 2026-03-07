@@ -150,7 +150,17 @@ STRETCHED_GRID_BUG_REASON = (
 )
 
 
-@pytest.mark.skip(reason=STRETCHED_GRID_BUG_REASON)
+_STRETCHED_GRID_BUGGY = False
+try:
+    _test_grid = cfd_python.create_grid_stretched(5, 5, 0.0, 1.0, 0.0, 1.0, 1.5)
+    # Bug: x_coords[-1] should be close to xmax, not xmin
+    if abs(_test_grid["x_coords"][-1] - _test_grid["xmax"]) > 0.1:
+        _STRETCHED_GRID_BUGGY = True
+except Exception:
+    _STRETCHED_GRID_BUGGY = True
+
+
+@pytest.mark.skipif(_STRETCHED_GRID_BUGGY, reason=STRETCHED_GRID_BUG_REASON)
 class TestCreateGridStretched:
     """Test create_grid_stretched function.
 
@@ -244,6 +254,12 @@ class TestCreateGridStretched:
 
         with pytest.raises(ValueError):
             cfd_python.create_grid_stretched(10, 10, 0.0, 1.0, 0.0, 1.0, -1.0)
+
+    def test_create_grid_stretched_repeated_calls(self):
+        """Verify no crashes or leaks under repeated calls."""
+        for _ in range(100):
+            grid = cfd_python.create_grid_stretched(5, 5, 0.0, 1.0, 0.0, 1.0, 1.5)
+            assert grid is not None
 
 
 class TestPhase6Exports:
