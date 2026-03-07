@@ -14,6 +14,16 @@ This directory contains example scripts demonstrating how to use the CFD Python 
 | [backend_detection.py](backend_detection.py) | Detecting SIMD/OpenMP/CUDA backend availability |
 | [error_handling.py](error_handling.py) | Error handling API with exceptions |
 
+### v0.2.0 Features
+
+| Example | Description |
+|---------|-------------|
+| [library_lifecycle.py](library_lifecycle.py) | Library init/finalize, version queries (v0.2.0) |
+| [poisson_solver.py](poisson_solver.py) | Poisson solver methods, backends, and presets (v0.2.0) |
+| [gpu_management.py](gpu_management.py) | GPU device detection, selection, and configuration (v0.2.0) |
+| [logging_example.py](logging_example.py) | Python logging callbacks for C library messages (v0.2.0) |
+| [grid_3d.py](grid_3d.py) | 3D grid creation and VTK output (v0.2.0) |
+
 ### Simulation Examples
 
 | Example | Description |
@@ -43,6 +53,17 @@ This directory contains example scripts demonstrating how to use the CFD Python 
 | Example | Description |
 |---------|-------------|
 | [derived_fields.py](derived_fields.py) | Computing derived quantities and statistics |
+
+### Physics Benchmarks
+
+| Example | Description |
+|---------|-------------|
+| [heat_conduction.py](heat_conduction.py) | Steady-state heat conduction with Dirichlet BCs and Jacobi iteration |
+| [taylor_green_vortex.py](taylor_green_vortex.py) | Taylor-Green vortex decay with analytical validation |
+| [backward_facing_step.py](backward_facing_step.py) | Backward-facing step with recirculation and stretched grid |
+| [duct_flow_3d.py](duct_flow_3d.py) | 3D square duct flow with cross-section analysis |
+| [grid_convergence.py](grid_convergence.py) | Formal grid convergence study with L2 error and GCI |
+| [poisson_comparison.py](poisson_comparison.py) | Poisson solver method and backend performance comparison |
 
 ## Running Examples
 
