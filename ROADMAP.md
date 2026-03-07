@@ -2,8 +2,8 @@
 
 This document outlines planned enhancements and new features for cfd-python after the v0.1.6 migration is complete.
 
-**Last Updated:** 2026-01-02
-**Current Version:** 0.1.6 (migration in progress)
+**Last Updated:** 2026-03-05
+**Current Version:** 0.1.6 (released)
 **Target Version:** 0.2.0+
 
 ---
@@ -14,10 +14,70 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
 
 ---
 
-## Phase 8: Type Stubs & IDE Support
+## CI/CD Lessons Learned (v0.1.6 Release)
+
+Key insights from the PyPI publishing process that should inform future releases:
+
+### Manylinux Compatibility (Critical for PyPI)
+
+| Issue | Solution |
+|-------|----------|
+| PyPI rejects `linux_x86_64` wheels | Build inside manylinux containers |
+| glibc version mismatch on ubuntu-latest | Use `quay.io/pypa/manylinux_2_28_x86_64` container |
+| auditwheel requires patchelf >= 0.14 | Install via pip (EPEL version too old) |
+| CUDA wheels need manylinux too | Use `nvidia/cuda:12.4.0-devel-rockylinux8` (manylinux_2_28 compatible) |
+
+### CUDA Wheel Building
+
+| Issue | Solution |
+|-------|----------|
+| CUDA not in standard manylinux containers | Use NVIDIA CUDA devel images based on Rocky Linux 8 |
+| CMake FetchContent needs git | `dnf install -y git` in container |
+| patchelf too old in EPEL | `pip install patchelf` instead |
+
+### Version Management
+
+| Issue | Solution |
+|-------|----------|
+| PyPI rejects local versions (`+g...`) | Build from git tag, not branch |
+| workflow_dispatch defaults to branch | Add `ref` input parameter to workflow |
+| sdist filename with hyphens | PyPI requires underscores (PEP 625) - rename if needed |
+
+### Partial Upload Recovery
+
+| Issue | Solution |
+|-------|----------|
+| Upload fails midway, can't re-upload same files | Add `skip-existing: true` to pypi-publish action |
+
+### Windows CUDA Optimization
+
+| Issue | Solution |
+|-------|----------|
+| CUDA toolkit install takes 14-16 min | Use `method: network` with minimal sub-packages |
+| CMake can't find CUDA toolset | Include `visual_studio_integration` in sub-packages |
+
+### Architecture Support
+
+For future ARM64 Linux support:
+
+```bash
+ARCH=$(uname -m)
+auditwheel repair dist_raw/*.whl --plat manylinux_2_28_${ARCH} -w dist/
+```
+
+### Recommended Workflow Structure
+
+1. **Build C library and wheel inside manylinux container** (not on host)
+2. **Use auditwheel to repair and tag wheels**
+3. **Support tag-based builds via `ref` input for releases**
+4. **Always use `skip-existing: true` for PyPI uploads**
+
+---
+
+## Phase 8: Type Stubs & IDE Support ✓ (Mostly Complete)
 
 **Priority:** P1 - High impact for developer experience
-**Estimated Effort:** 2-3 days
+**Status:** Core tasks done, CI integration remaining
 
 ### Goals
 
@@ -27,60 +87,23 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
 
 ### Tasks
 
-- [ ] **8.1 Create `cfd_python.pyi` stub file**
-  ```python
-  # Example stub content
-  from typing import Dict, List, Optional, Union
+- [x] **8.1 Create `cfd_python/__init__.pyi` stub file**
+  - Comprehensive stubs covering all exported functions, constants, and classes
 
-  # Constants
-  SIMD_NONE: int
-  SIMD_AVX2: int
-  SIMD_NEON: int
+- [x] **8.2 Add `py.typed` marker file**
+  - `cfd_python/py.typed` exists for PEP 561 compliance
 
-  BACKEND_SCALAR: int
-  BACKEND_SIMD: int
-  BACKEND_OMP: int
-  BACKEND_CUDA: int
-
-  # Functions
-  def create_grid(
-      nx: int,
-      ny: int,
-      xmin: float,
-      xmax: float,
-      ymin: float,
-      ymax: float,
-  ) -> Dict[str, Union[int, float, List[float]]]: ...
-
-  def run_simulation(
-      nx: int,
-      ny: int,
-      *,
-      steps: int = ...,
-      solver_type: str = ...,
-      xmin: float = ...,
-      xmax: float = ...,
-      ymin: float = ...,
-      ymax: float = ...,
-      output_file: Optional[str] = ...,
-  ) -> List[float]: ...
-  ```
-
-- [ ] **8.2 Add `py.typed` marker file**
-  - Create empty `cfd_python/py.typed` for PEP 561 compliance
-
-- [ ] **8.3 Update `pyproject.toml`**
-  - Add stub files to package data
-  - Configure mypy/pyright settings
+- [x] **8.3 Update `pyproject.toml`**
+  - mypy included in `[project.optional-dependencies] dev`
 
 - [ ] **8.4 Add type checking to CI**
   - Run mypy on tests to verify stubs are correct
 
 ### Success Criteria
 
-- IDE shows function signatures and return types
-- `mypy tests/` passes without errors
-- Stubs cover all exported functions and constants
+- [x] IDE shows function signatures and return types
+- [ ] `mypy tests/` passes without errors — not yet in CI
+- [x] Stubs cover all exported functions and constants
 
 ---
 
@@ -98,66 +121,6 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
 ### Tasks
 
 - [ ] **9.1 Create enum classes in `_enums.py`**
-  ```python
-  from enum import IntEnum
-
-  class SIMDArch(IntEnum):
-      """SIMD architecture detected on the system."""
-      NONE = 0
-      AVX2 = 1
-      NEON = 2
-
-  class Backend(IntEnum):
-      """Solver backend types."""
-      SCALAR = 0
-      SIMD = 1
-      OMP = 2
-      CUDA = 3
-
-  class BCType(IntEnum):
-      """Boundary condition types."""
-      PERIODIC = 0
-      NEUMANN = 1
-      DIRICHLET = 2
-      NOSLIP = 3
-      INLET = 4
-      OUTLET = 5
-
-  class BCEdge(IntEnum):
-      """Boundary edges."""
-      LEFT = 0
-      RIGHT = 1
-      BOTTOM = 2
-      TOP = 3
-
-  class BCBackend(IntEnum):
-      """Boundary condition backends."""
-      AUTO = 0
-      SCALAR = 1
-      OMP = 2
-      SIMD = 3
-      CUDA = 4
-
-  class OutputType(IntEnum):
-      """Output file types."""
-      VELOCITY = 0
-      VELOCITY_MAGNITUDE = 1
-      FULL_FIELD = 2
-      CSV_TIMESERIES = 3
-      CSV_CENTERLINE = 4
-      CSV_STATISTICS = 5
-
-  class StatusCode(IntEnum):
-      """CFD operation status codes."""
-      SUCCESS = 0
-      ERROR = -1
-      ERROR_NOMEM = -2
-      ERROR_INVALID = -3
-      ERROR_IO = -4
-      ERROR_UNSUPPORTED = -5
-      ERROR_DIVERGED = -6
-      ERROR_MAX_ITER = -7
-  ```
 
 - [ ] **9.2 Export enums alongside bare constants**
   - Maintain backward compatibility with `SIMD_NONE`, `BACKEND_SCALAR`, etc.
@@ -191,169 +154,12 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
 ### Tasks
 
 - [ ] **10.1 Create `Grid` class**
-  ```python
-  class Grid:
-      """High-level grid object with coordinate access."""
-
-      def __init__(self, nx: int, ny: int,
-                   xmin: float = 0.0, xmax: float = 1.0,
-                   ymin: float = 0.0, ymax: float = 1.0,
-                   stretching: Optional[float] = None):
-          if stretching is not None:
-              self._data = create_grid_stretched(nx, ny, xmin, xmax, ymin, ymax, stretching)
-          else:
-              self._data = create_grid(nx, ny, xmin, xmax, ymin, ymax)
-
-      @property
-      def nx(self) -> int:
-          return self._data["nx"]
-
-      @property
-      def ny(self) -> int:
-          return self._data["ny"]
-
-      @property
-      def x(self) -> List[float]:
-          return self._data.get("x", self._data.get("x_coords", []))
-
-      @property
-      def y(self) -> List[float]:
-          return self._data.get("y", self._data.get("y_coords", []))
-
-      @property
-      def shape(self) -> tuple[int, int]:
-          return (self.nx, self.ny)
-
-      @property
-      def bounds(self) -> tuple[float, float, float, float]:
-          return (self._data["xmin"], self._data["xmax"],
-                  self._data["ymin"], self._data["ymax"])
-  ```
 
 - [ ] **10.2 Create `BoundaryConditions` builder**
-  ```python
-  class BoundaryConditions:
-      """Fluent builder for boundary conditions."""
-
-      def __init__(self, u: List[float], v: List[float], nx: int, ny: int):
-          self.u = u
-          self.v = v
-          self.nx = nx
-          self.ny = ny
-
-      def noslip_walls(self) -> "BoundaryConditions":
-          """Apply no-slip condition to all walls."""
-          bc_apply_noslip(self.u, self.v, self.nx, self.ny)
-          return self
-
-      def inlet_uniform(self, edge: BCEdge, u: float, v: float = 0.0) -> "BoundaryConditions":
-          """Apply uniform inlet velocity."""
-          bc_apply_inlet_uniform(self.u, self.v, self.nx, self.ny, u, v, int(edge))
-          return self
-
-      def inlet_parabolic(self, edge: BCEdge, max_velocity: float) -> "BoundaryConditions":
-          """Apply parabolic inlet profile."""
-          bc_apply_inlet_parabolic(self.u, self.v, self.nx, self.ny, max_velocity, int(edge))
-          return self
-
-      def outlet(self, edge: BCEdge) -> "BoundaryConditions":
-          """Apply zero-gradient outlet."""
-          bc_apply_outlet_velocity(self.u, self.v, self.nx, self.ny, int(edge))
-          return self
-
-      # Context manager support
-      def __enter__(self) -> "BoundaryConditions":
-          return self
-
-      def __exit__(self, *args) -> None:
-          pass
-
-  # Usage:
-  # bc = BoundaryConditions(u, v, nx, ny)
-  # bc.noslip_walls().inlet_uniform(BCEdge.LEFT, u=1.0).outlet(BCEdge.RIGHT)
-  ```
 
 - [ ] **10.3 Create `Simulation` class**
-  ```python
-  class Simulation:
-      """High-level simulation runner."""
-
-      def __init__(self, grid: Grid, solver: str = "explicit_euler"):
-          self.grid = grid
-          self.solver = solver
-          self._params = get_default_solver_params()
-          self._result = None
-
-      def set_params(self, **kwargs) -> "Simulation":
-          """Set solver parameters."""
-          self._params.update(kwargs)
-          return self
-
-      def run(self, steps: int, output_file: Optional[str] = None) -> "SimulationResult":
-          """Run the simulation."""
-          result = run_simulation_with_params(
-              self.grid.nx, self.grid.ny,
-              *self.grid.bounds,
-              steps=steps,
-              solver_type=self.solver,
-              output_file=output_file,
-              **self._params
-          )
-          self._result = SimulationResult(result)
-          return self._result
-
-  class SimulationResult:
-      """Container for simulation results with statistics."""
-
-      def __init__(self, data: dict):
-          self._data = data
-
-      @property
-      def velocity_magnitude(self) -> List[float]:
-          return self._data["velocity_magnitude"]
-
-      @property
-      def stats(self) -> dict:
-          return self._data["stats"]
-
-      def compute_statistics(self, u: List[float], v: List[float], p: List[float]) -> dict:
-          return compute_flow_statistics(u, v, p, self._data["nx"], self._data["ny"])
-  ```
 
 - [ ] **10.4 Create `Field` class for data manipulation**
-  ```python
-  class Field:
-      """Scalar field with statistics and operations."""
-
-      def __init__(self, data: List[float], nx: int, ny: int):
-          self.data = data
-          self.nx = nx
-          self.ny = ny
-
-      @property
-      def shape(self) -> tuple[int, int]:
-          return (self.nx, self.ny)
-
-      @property
-      def stats(self) -> dict:
-          return calculate_field_stats(self.data)
-
-      @property
-      def min(self) -> float:
-          return self.stats["min"]
-
-      @property
-      def max(self) -> float:
-          return self.stats["max"]
-
-      @property
-      def mean(self) -> float:
-          return self.stats["avg"]
-
-      def to_vtk(self, filename: str, name: str = "field") -> None:
-          write_vtk_scalar(filename, name, self.data, self.nx, self.ny,
-                          0.0, 1.0, 0.0, 1.0)
-  ```
 
 - [ ] **10.5 Add tests for high-level API**
 
@@ -385,6 +191,7 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
   - Support both list and ndarray inputs
 
 - [ ] **11.2 Create array conversion utilities**
+
   ```python
   def to_numpy(data: List[float], shape: tuple[int, int]) -> np.ndarray:
       """Convert flat list to 2D NumPy array."""
@@ -396,6 +203,7 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
   ```
 
 - [ ] **11.3 Add `as_numpy` option to functions**
+
   ```python
   def run_simulation(..., as_numpy: bool = False) -> Union[List[float], np.ndarray]:
       result = _run_simulation_impl(...)
@@ -405,6 +213,7 @@ With the v0.1.6 migration completing core functionality (boundary conditions, er
   ```
 
 - [ ] **11.4 Support array protocol in Field class**
+
   ```python
   class Field:
       def __array__(self) -> np.ndarray:
@@ -439,6 +248,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 ### Tasks
 
 - [ ] **12.1 Add optional dependency**
+
   ```toml
   [project.optional-dependencies]
   viz = ["cfd-visualization>=0.2.0"]
@@ -469,6 +279,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 ### Tasks
 
 - [ ] **13.1 Add timing to simulation results**
+
   ```python
   result = run_simulation_with_params(...)
   print(result["timing"])
@@ -476,6 +287,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **13.2 Create benchmarking utilities**
+
   ```python
   from cfd_python.benchmark import benchmark_solver
 
@@ -489,6 +301,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **13.3 Add backend comparison utility**
+
   ```python
   from cfd_python.benchmark import compare_backends
 
@@ -511,6 +324,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 
 **Priority:** P3 - Advanced use case
 **Estimated Effort:** 3-5 days
+**Spec:** [`.claude/specs/phase-14-async-parallel-simulation.md`](.claude/specs/phase-14-async-parallel-simulation.md)
 
 ### Goals
 
@@ -520,39 +334,19 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 
 ### Tasks
 
-- [ ] **14.1 Add progress callback support**
-  ```python
-  def progress_callback(step: int, total: int, stats: dict):
-      print(f"Step {step}/{total}: max_vel={stats['max_velocity']:.4f}")
-
-  run_simulation_with_params(..., callback=progress_callback, callback_interval=10)
-  ```
-
-- [ ] **14.2 Create async simulation wrapper**
-  ```python
-  import asyncio
-
-  async def run_simulation_async(...) -> SimulationResult:
-      """Run simulation in background thread."""
-      loop = asyncio.get_event_loop()
-      return await loop.run_in_executor(None, run_simulation_with_params, ...)
-  ```
-
-- [ ] **14.3 Add parameter sweep utility**
-  ```python
-  from cfd_python.parallel import parameter_sweep
-
-  results = parameter_sweep(
-      base_params={'nx': 64, 'ny': 64, 'steps': 100},
-      vary={'dt': [0.001, 0.0005, 0.0001], 'cfl': [0.5, 0.8]},
-      n_workers=4
-  )
-  ```
+- [ ] **14.1 Add progress callback support** — `callback` and `callback_interval` keyword arguments on `run_simulation_with_params()`, with cancellation via `False` return
+- [ ] **14.1b Release GIL during simulation loop** — `Py_BEGIN_ALLOW_THREADS` / `Py_END_ALLOW_THREADS` around the step loop to enable thread-based parallelism
+- [ ] **14.2 Create async simulation wrapper** — `run_simulation_async()` in `cfd_python/_async.py` using `loop.run_in_executor()` with task cancellation support
+- [ ] **14.3 Add parameter sweep utility** — `parameter_sweep()` in `cfd_python/_parallel.py` using `ProcessPoolExecutor` with Cartesian product of parameter variations
+- [ ] **14.4 Update exports and type stubs** — re-export new functions from `__init__.py`, add signatures to `__init__.pyi`
+- [ ] **14.5 Add tests** — `tests/test_async.py` and `tests/test_parallel.py` covering callbacks, cancellation, concurrency, and parameter sweeps
 
 ### Success Criteria
 
-- Long simulations can report progress
-- Multiple simulations can run in parallel
+- Long simulations can report progress via callbacks without significant overhead
+- Callbacks can cancel a running simulation
+- `run_simulation_async()` does not block the asyncio event loop
+- Multiple simulations run in parallel via `parameter_sweep()` with true CPU parallelism
 - Parameter sweeps are easy to set up
 
 ---
@@ -571,6 +365,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 ### Tasks
 
 - [ ] **15.1 Expose 3D grid functions from C library**
+
   ```python
   def create_grid_3d(
       nx: int, ny: int, nz: int,
@@ -581,6 +376,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **15.2 Add 3D boundary condition edges**
+
   ```python
   class BCFace(IntEnum):
       """3D boundary faces."""
@@ -593,6 +389,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **15.3 Extend Field class for 3D**
+
   ```python
   class Field3D(Field):
       def __init__(self, data: List[float], nx: int, ny: int, nz: int):
@@ -630,6 +427,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 ### Tasks
 
 - [ ] **16.1 Add checkpoint save/load functions**
+
   ```python
   def save_checkpoint(
       filename: str,
@@ -646,6 +444,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **16.2 Add automatic checkpointing to Simulation class**
+
   ```python
   sim = Simulation(grid)
   sim.run(
@@ -656,12 +455,14 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **16.3 Add resume functionality**
+
   ```python
   sim = Simulation.from_checkpoint("./checkpoints/step_5000.h5")
   sim.run(steps=5000)  # Continues from step 5000
   ```
 
 - [ ] **16.4 Optional HDF5 support**
+
   ```toml
   [project.optional-dependencies]
   hdf5 = ["h5py>=3.0"]
@@ -689,6 +490,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
 ### Tasks
 
 - [ ] **17.1 Implement lid-driven cavity benchmark**
+
   ```python
   from cfd_python.validation import lid_driven_cavity
 
@@ -701,6 +503,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **17.2 Implement Poiseuille flow validation**
+
   ```python
   from cfd_python.validation import poiseuille_flow
 
@@ -712,6 +515,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) for visualizati
   ```
 
 - [ ] **17.3 Implement Taylor-Green vortex decay**
+
   ```python
   from cfd_python.validation import taylor_green_vortex
 
@@ -822,6 +626,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Tasks
 
 - [ ] **19.1 Define configuration schema**
+
   ```yaml
   # simulation.yaml
   grid:
@@ -865,6 +670,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **19.2 Create config loader**
+
   ```python
   from cfd_python.config import load_config, run_from_config
 
@@ -873,10 +679,11 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **19.3 Add CLI entry point**
+
   ```bash
-  $ cfd-python run simulation.yaml
-  $ cfd-python validate simulation.yaml
-  $ cfd-python info  # Show available solvers, backends
+  cfd-python run simulation.yaml
+  cfd-python validate simulation.yaml
+  cfd-python info  # Show available solvers, backends
   ```
 
 - [ ] **19.4 Config validation with helpful errors**
@@ -903,6 +710,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Tasks
 
 - [ ] **20.1 Define plugin interface**
+
   ```python
   from cfd_python.plugins import SolverPlugin, register_plugin
 
@@ -917,6 +725,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **20.2 Plugin discovery mechanism**
+
   ```python
   # Automatic discovery via entry points
   # pyproject.toml of plugin package:
@@ -925,6 +734,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **20.3 Custom BC plugin support**
+
   ```python
   from cfd_python.plugins import BCPlugin
 
@@ -960,6 +770,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Tasks
 
 - [ ] **21.1 Add memory usage reporting**
+
   ```python
   from cfd_python.memory import estimate_memory, get_memory_usage
 
@@ -972,6 +783,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **21.2 Memory-mapped field storage**
+
   ```python
   grid = Grid(nx=4096, ny=4096)
   sim = Simulation(grid, memory_mode="mmap", mmap_dir="/tmp/cfd")
@@ -1005,6 +817,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Tasks
 
 - [ ] **22.1 GPU memory reporting**
+
   ```python
   from cfd_python.cuda import get_gpu_info, get_gpu_memory
 
@@ -1016,6 +829,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **22.2 Device selection**
+
   ```python
   from cfd_python.cuda import set_device
 
@@ -1024,6 +838,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **22.3 Multi-GPU domain decomposition**
+
   ```python
   sim = Simulation(
       grid,
@@ -1057,6 +872,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Tasks
 
 - [ ] **23.1 Add structured logging**
+
   ```python
   import logging
   logging.basicConfig(level=logging.INFO)
@@ -1067,6 +883,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **23.2 Configurable log levels**
+
   ```python
   import cfd_python
   cfd_python.set_log_level("DEBUG")  # Verbose output
@@ -1074,6 +891,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
   ```
 
 - [ ] **23.3 Metrics collection**
+
   ```python
   from cfd_python.metrics import get_metrics
 
@@ -1149,6 +967,7 @@ See [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) Phase 2 for vis
 ### Background
 
 Physics-Informed Neural Networks embed physical laws (Navier-Stokes equations) into the loss function, achieving:
+
 - ~1000× speedup over traditional CFD for inference
 - <5% relative error for velocity fields
 - 5-10× less memory than CFD solvers
@@ -1277,7 +1096,7 @@ ml-jax = ["jax>=0.4", "flax>=0.7", "cfd-python[ml]"]
 
 | Version | Phases | Focus |
 |---------|--------|-------|
-| 0.2.0 | 8, 9 | Type safety & IDE support |
+| 0.2.0 | 8 (mostly done), 9 | Type safety & IDE support |
 | 0.3.0 | 10, 11 | High-level API & NumPy |
 | 0.4.0 | 12, 13 | cfd-visualization integration & profiling |
 | 0.5.0 | 14, 17 | Async, parallel & validation |
@@ -1294,6 +1113,7 @@ ml-jax = ["jax>=0.4", "flax>=0.7", "cfd-python[ml]"]
 Items not yet planned but worth considering:
 
 ### Simulation Features
+
 - [ ] Turbulence models (k-ε, k-ω, LES)
 - [ ] Multiphase flow support
 - [ ] Compressible flow solvers
@@ -1302,6 +1122,7 @@ Items not yet planned but worth considering:
 - [ ] Moving mesh support
 
 ### I/O & Interoperability
+
 - [ ] OpenFOAM mesh import/export
 - [ ] CGNS format support
 - [ ] ParaView Catalyst integration
@@ -1309,6 +1130,7 @@ Items not yet planned but worth considering:
 - [ ] STL geometry import
 
 ### Performance
+
 - [ ] Mixed precision (FP32/FP64)
 - [ ] Sparse matrix solvers
 - [ ] Multigrid preconditioners
@@ -1340,7 +1162,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Related Documents
 
-- [MIGRATION_PLAN.md](MIGRATION_PLAN.md) - Current v0.1.6 migration status
 - [README.md](README.md) - User documentation
 - [CHANGELOG.md](CHANGELOG.md) - Version history
 - [cfd-visualization ROADMAP](../cfd-visualization/ROADMAP.md) - Visualization library roadmap

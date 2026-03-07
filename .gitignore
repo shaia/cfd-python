@@ -161,6 +161,7 @@ examples/output/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -173,3 +174,4 @@ examples/output/
 .Trashes
 ehthumbs.db
 Thumbs.db
+.early.coverage
