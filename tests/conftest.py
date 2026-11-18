@@ -31,8 +31,7 @@ try:
         # In CI (indicated by CI env var), fail instead of skip
         if os.environ.get("CI"):
             raise RuntimeError(
-                "CFD Python C extension not built. "
-                "The wheel may be missing the compiled extension."
+                "CFD Python C extension not built. The wheel may be missing the compiled extension."
             )
         else:
             pytest.skip(

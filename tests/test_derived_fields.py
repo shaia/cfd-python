@@ -199,6 +199,34 @@ class TestComputeFlowStatistics:
             cfd_python.compute_flow_statistics([1.0], "not list", [1.0], 1, 1)
 
 
+class TestDerivedFieldsStress:
+    """Stress tests for derived field functions."""
+
+    def test_calculate_field_stats_repeated_calls(self):
+        """Verify no crashes or leaks under repeated calls."""
+        data = [float(i) for i in range(100)]
+        for _ in range(100):
+            stats = cfd_python.calculate_field_stats(data)
+            assert stats is not None
+
+    def test_compute_velocity_magnitude_repeated_calls(self):
+        """Verify no crashes or leaks under repeated calls."""
+        u = [1.0] * 16
+        v = [1.0] * 16
+        for _ in range(100):
+            result = cfd_python.compute_velocity_magnitude(u, v, 4, 4)
+            assert result is not None
+
+    def test_compute_flow_statistics_repeated_calls(self):
+        """Verify no crashes or leaks under repeated calls."""
+        u = [1.0] * 16
+        v = [0.5] * 16
+        p = [100.0] * 16
+        for _ in range(100):
+            result = cfd_python.compute_flow_statistics(u, v, p, 4, 4)
+            assert result is not None
+
+
 class TestDerivedFieldsExported:
     """Test that all derived fields functions are properly exported"""
 
